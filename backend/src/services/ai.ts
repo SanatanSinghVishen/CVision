@@ -11,7 +11,7 @@ export async function analyzeResume(
 
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-        throw new Error("Missing GROQ_API_KEY environment variable. Please check your .env file.");
+        throw new Error("Missing GROQ_API_KEY environment variable.");
     }
 
     const groq = new Groq({

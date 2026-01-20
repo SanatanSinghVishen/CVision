@@ -113,7 +113,8 @@ const UploadPage = () => {
             setCurrentStep(2);
             setStatusText('AI Analyzing...');
 
-            const response = await fetch('/api/analyze', {
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${apiUrl}/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -121,8 +122,7 @@ const UploadPage = () => {
                 body: JSON.stringify({
                     jobTitle,
                     jobDescription,
-                    resumeText,
-                    accessToken: session.access_token
+                    resumeText
                 })
             });
 
