@@ -25,31 +25,37 @@ export default function Home() {
 
     // Listen for auth changes directly
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted) return;
-
-      if (!session) {
-        // Only redirect if we are sure we have no session
-        // And maybe add a small delay or check event type?
-        // Actually, onAuthStateChange fires 'INITIAL_SESSION' instantly if known.
+      if (event === 'SIGNED_OUT') {
         navigate('/auth');
-      } else {
-        // We have a session, fetch data
-        setLoading(true);
-        supabase
-          .from('resumes')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .order('created_at', { ascending: false })
-          .then(({ data, error }) => {
-            if (mounted) {
-              if (!error && data) {
-                setResumes(data);
-              }
-              setLoading(false);
-            }
-          });
       }
     });
+
+    const checkUser = async () => {
+      // getSession waits for storage to load
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        navigate('/auth');
+        return;
+      }
+
+      // We have a session, fetch data
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('resumes')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+
+      if (mounted) {
+        if (!error && data) {
+          setResumes(data);
+        }
+        setLoading(false);
+      }
+    };
+
+    checkUser();
 
     return () => {
       mounted = false;

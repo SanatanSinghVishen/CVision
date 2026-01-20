@@ -32,8 +32,17 @@ const UploadPage = () => {
     ];
 
     useEffect(() => {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        // Initial check using getSession to avoid race conditions
+        const checkAuth = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
+                navigate('/auth');
+            }
+        };
+        checkAuth();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_OUT') {
                 navigate('/auth');
             }
         });
