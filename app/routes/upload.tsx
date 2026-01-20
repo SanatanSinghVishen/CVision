@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useState, useEffect } from 'react'
 import Navbar from "~/components/Navbar";
 import { type MetaFunction, useNavigate } from "react-router";
 import { convertPdfToImage, extractTextFromPdf } from "~/lib/pdf2img";
@@ -30,6 +30,15 @@ const UploadPage = () => {
         { label: "AI Analysis", icon: Sparkles },
         { label: "Saving Results", icon: CheckCircle2 }
     ];
+
+    useEffect(() => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (!session) {
+                navigate('/auth');
+            }
+        });
+        return () => subscription.unsubscribe();
+    }, [navigate]);
 
     const handleFileSelect = (selectedFile: File | null) => {
         setFile(selectedFile);
@@ -63,6 +72,11 @@ const UploadPage = () => {
                 navigate('/auth');
                 return;
             }
+
+            // Keep the manual check in submit just in case, or rely on RLS.
+            // But we need to remove the initial check block that was causing issues if we rely on useEffect.
+            // Ideally, we just check session existence inside submit.
+
 
             // 2. Convert PDF & Extract Text
             setCurrentStep(0);
