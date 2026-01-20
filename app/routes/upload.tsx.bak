@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import Navbar from "~/components/Navbar";
 import { type MetaFunction, useNavigate } from "react-router";
-import { convertPdfToImage, extractTextFromPdf } from "~/lib/pdf2img";
+// import { convertPdfToImage, extractTextFromPdf } from "~/lib/pdf2img";
 import { supabase } from "~/lib/supabase";
 
 import { Upload, FileText, Sparkles, CheckCircle2, Loader2 } from "lucide-react";
@@ -14,7 +14,7 @@ export const meta: MetaFunction = () => {
     ];
 };
 
-// export const loader = async () => null;
+export const loader = async () => null;
 
 const UploadPage = () => {
     const navigate = useNavigate();
@@ -67,31 +67,31 @@ const UploadPage = () => {
             // 2. Convert PDF & Extract Text
             setCurrentStep(0);
             setStatusText('Processing PDF...');
-            const imageResult = await convertPdfToImage(file);
-            if (!imageResult.file) {
-                const errorMsg = imageResult.error || "PDF Conversion Failed";
-                throw new Error(errorMsg);
-            }
-            const resumeText = await extractTextFromPdf(file);
+            // const imageResult = await convertPdfToImage(file);
+            // if (!imageResult.file) {
+            //     const errorMsg = imageResult.error || "PDF Conversion Failed";
+            //     throw new Error(errorMsg);
+            // }
+            const resumeText = ""; // await extractTextFromPdf(file);
 
             // 3. Upload to Supabase Storage
             setCurrentStep(1);
             setStatusText('Uploading Files...');
             const timestamp = Date.now();
             const resumePath = `${session.user.id}/${timestamp}_${file.name}`;
-            const imagePath = `${session.user.id}/${timestamp}_${imageResult.file.name}`;
+            const imagePath = ""; // `${session.user.id}/${timestamp}_${imageResult.file.name}`;
 
             const { error: resumeError } = await supabase.storage
                 .from('resumes')
                 .upload(resumePath, file);
             if (resumeError) throw new Error(`Resume Upload Failed: ${resumeError.message}`);
 
-
+            /*
             const { error: imageError } = await supabase.storage
                 .from('resumes')
                 .upload(imagePath, imageResult.file);
             if (imageError) throw new Error(`Image Upload Failed: ${imageError.message}`);
-
+            */
 
             // 4. Initial DB Insert
             setStatusText('Saving Resume Data...');

@@ -14,7 +14,7 @@ export const meta = () => ([
     { name: 'description', content: 'Detailed overview of your resume' },
 ])
 
-export const loader = async () => null;
+// export const loader = async () => null;
 
 const Resume = () => {
     const { id } = useParams();
@@ -141,8 +141,6 @@ const Resume = () => {
                 <div className="grid lg:grid-cols-[400px_1fr] gap-8">
                     {/* Left: PDF Preview (Sticky) */}
                     <aside
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
                         className="lg:sticky lg:top-36 lg:h-[calc(100vh-10rem)]"
                     >
                         <div className="bg-slate-900/50 backdrop-blur-md border border-white/10 rounded-2xl p-4 h-full overflow-hidden shadow-2xl">
@@ -164,9 +162,6 @@ const Resume = () => {
 
                     {/* Right: Analysis Panel */}
                     <section
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 }}
                         className="flex flex-col gap-8"
                     >
                         {feedback ? (

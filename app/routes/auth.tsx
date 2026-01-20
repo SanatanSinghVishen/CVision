@@ -10,7 +10,7 @@ export const meta = () => ([
     { name: 'description', content: 'Log into your account' },
 ])
 
-export const loader = async () => null;
+// export const loader = async () => null;
 
 const Auth = () => {
     const [isLoading, setIsLoading] = useState(true);

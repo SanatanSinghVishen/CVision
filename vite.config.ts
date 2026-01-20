@@ -9,10 +9,10 @@ export default defineConfig({
     exclude: ["@react-router/node", "@react-router/dev", "@supabase/supabase-js"],
   },
 });
- // touch
- // touch2
- // touch3
- // touch4
- // ui-overhaul
- // final-fix
- // complete
+// touch
+// touch2
+// touch3
+// touch4
+// ui-overhaul
+// final-fix
+// complete

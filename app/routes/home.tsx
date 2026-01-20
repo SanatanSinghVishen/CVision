@@ -13,7 +13,7 @@ export function meta({ }: Route.MetaArgs) {
   ];
 }
 
-export const loader = async () => null;
+// export const loader = async () => null;
 
 export default function Home() {
   const [resumes, setResumes] = useState<any[]>([]);
