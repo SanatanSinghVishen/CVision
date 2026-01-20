@@ -1,0 +1,22 @@
+[dotenv@17.2.3] injecting env (3) from .env -- tip: ≡ƒ¢á∩╕Å  run anywhere with `dotenvx run -- yourcommand`
+Checking last 5 resumes...
+[2026-01-20T05:58:52.165811+00:00] ID: 2bd2b45f-744b-411b-90b6-749ed9762890
+   Company: MIcrosoft
+   Feedback Saved: false (NULL)
+-------------------------------------------------
+[2026-01-20T05:55:04.488737+00:00] ID: 7624f9b3-1905-40de-8df8-31b965d55f39
+   Company: MIcrosoft
+   Feedback Saved: false (NULL)
+-------------------------------------------------
+[2026-01-20T05:52:18.761057+00:00] ID: 334030a0-342c-49b7-ac96-30f5bb99c012
+   Company: MIcrosoft
+   Feedback Saved: false (NULL)
+-------------------------------------------------
+[2026-01-20T05:49:38.576086+00:00] ID: 1fa77931-9294-4e9f-9222-469d642a51ef
+   Company: MIcrosoft
+   Feedback Saved: false (NULL)
+-------------------------------------------------
+[2026-01-20T05:44:54.828691+00:00] ID: 015e1b56-d596-417c-88e0-69e86708e975
+   Company: MIcrosoft
+   Feedback Saved: false (NULL)
+-------------------------------------------------

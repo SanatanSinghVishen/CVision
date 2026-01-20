@@ -1,0 +1,26 @@
+[dotenv@17.2.3] injecting env (3) from .env -- tip: ≡ƒöÉ prevent committing .env to code: https://dotenvx.com/precommit
+Fetching available models...
+
+--- AVAILABLE MODELS ---
+- meta-llama/llama-prompt-guard-2-86m (Owner: Meta)
+- whisper-large-v3 (Owner: OpenAI)
+- openai/gpt-oss-120b (Owner: OpenAI)
+- llama-3.3-70b-versatile (Owner: Meta)
+- meta-llama/llama-4-maverick-17b-128e-instruct (Owner: Meta)
+- openai/gpt-oss-safeguard-20b (Owner: OpenAI)
+- whisper-large-v3-turbo (Owner: OpenAI)
+- llama-3.1-8b-instant (Owner: Meta)
+- meta-llama/llama-4-scout-17b-16e-instruct (Owner: Meta)
+- meta-llama/llama-guard-4-12b (Owner: Meta)
+- moonshotai/kimi-k2-instruct-0905 (Owner: Moonshot AI)
+- groq/compound (Owner: Groq)
+- moonshotai/kimi-k2-instruct (Owner: Moonshot AI)
+- meta-llama/llama-prompt-guard-2-22m (Owner: Meta)
+- canopylabs/orpheus-v1-english (Owner: Canopy Labs)
+- allam-2-7b (Owner: SDAIA)
+- openai/gpt-oss-20b (Owner: OpenAI)
+- canopylabs/orpheus-arabic-saudi (Owner: Canopy Labs)
+- qwen/qwen3-32b (Owner: Alibaba Cloud)
+- groq/compound-mini (Owner: Groq)
+------------------------
+

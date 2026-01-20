@@ -1,0 +1,362 @@
+import { type FormEvent, useState } from 'react'
+import Navbar from "~/components/Navbar";
+import { type MetaFunction, useNavigate } from "react-router";
+import { convertPdfToImage, extractTextFromPdf } from "~/lib/pdf2img";
+import { supabase } from "~/lib/supabase";
+
+import { Upload, FileText, Sparkles, CheckCircle2, Loader2 } from "lucide-react";
+import Button from "~/components/Button";
+
+export const meta: MetaFunction = () => {
+    return [
+        { title: "CVision | Upload Resume" },
+        { name: "description", content: "Upload your resume for AI analysis" },
+    ];
+};
+
+export const loader = async () => null;
+
+const UploadPage = () => {
+    const navigate = useNavigate();
+    const [statusText, setStatusText] = useState('');
+    const [file, setFile] = useState<File | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [currentStep, setCurrentStep] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+
+    const steps = [
+        { label: "Extracting Text", icon: FileText },
+        { label: "Uploading Files", icon: Upload },
+        { label: "AI Analysis", icon: Sparkles },
+        { label: "Saving Results", icon: CheckCircle2 }
+    ];
+
+    const handleFileSelect = (selectedFile: File | null) => {
+        setFile(selectedFile);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const droppedFile = e.dataTransfer.files[0];
+        if (droppedFile && droppedFile.type === 'application/pdf') {
+            setFile(droppedFile);
+        }
+    };
+
+    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!file) return;
+
+        const formData = new FormData(e.currentTarget);
+        const companyName = formData.get('company-name') as string;
+        const jobTitle = formData.get('job-title') as string;
+        const jobDescription = formData.get('job-description') as string;
+
+        setIsProcessing(true);
+        setStatusText('Starting Analysis...');
+
+        try {
+            // 1. Auth Check
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                navigate('/auth');
+                return;
+            }
+
+            // 2. Convert PDF & Extract Text
+            setCurrentStep(0);
+            setStatusText('Processing PDF...');
+            const imageResult = await convertPdfToImage(file);
+            if (!imageResult.file) {
+                const errorMsg = imageResult.error || "PDF Conversion Failed";
+                throw new Error(errorMsg);
+            }
+            const resumeText = await extractTextFromPdf(file);
+
+            // 3. Upload to Supabase Storage
+            setCurrentStep(1);
+            setStatusText('Uploading Files...');
+            const timestamp = Date.now();
+            const resumePath = `${session.user.id}/${timestamp}_${file.name}`;
+            const imagePath = `${session.user.id}/${timestamp}_${imageResult.file.name}`;
+
+            const { error: resumeError } = await supabase.storage
+                .from('resumes')
+                .upload(resumePath, file);
+            if (resumeError) throw new Error(`Resume Upload Failed: ${resumeError.message}`);
+
+            const { error: imageError } = await supabase.storage
+                .from('resumes')
+                .upload(imagePath, imageResult.file);
+            if (imageError) throw new Error(`Image Upload Failed: ${imageError.message}`);
+
+            // 4. Initial DB Insert
+            setStatusText('Saving Resume Data...');
+            const { data: resumeData, error: dbError } = await supabase
+                .from('resumes')
+                .insert({
+                    user_id: session.user.id,
+                    company_name: companyName,
+                    job_title: jobTitle,
+                    job_description: jobDescription,
+                    resume_path: resumePath,
+                    image_path: imagePath,
+                    feedback: null
+                })
+                .select()
+                .single();
+
+            if (dbError) throw new Error(`DB Save Failed: ${dbError.message}`);
+
+            // 5. Call AI API
+            setCurrentStep(2);
+            setStatusText('AI Analyzing...');
+
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    jobTitle,
+                    jobDescription,
+                    resumeText,
+                    accessToken: session.access_token
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`AI Analysis Failed: ${response.status} ${errorText}`);
+            }
+
+            const { feedback, error: apiError } = await response.json();
+            if (apiError) throw new Error(apiError);
+
+            // 6. Update DB with Feedback
+            setCurrentStep(3);
+            console.log("Upload: Attempting to save feedback:", feedback);
+            const { data: updateData, error: updateError } = await supabase
+                .from('resumes')
+                .update({ feedback })
+                .eq('id', resumeData.id)
+                .select();
+
+            if (updateError) throw new Error(`Failed to save feedback: ${updateError.message}`);
+
+            if (!updateData || updateData.length === 0) {
+                console.error("Upload: Update returned no rows. Possible RLS issue.");
+                throw new Error("Database Save Failed (Permission Denied). Please check Supabase policies.");
+            }
+
+            console.log("Upload: Feedback saved successfully.", updateData);
+
+            // 7. Done
+            navigate(`/resume/${resumeData.id}`);
+
+        } catch (error: any) {
+            console.error("Upload Logic Error:", error);
+            setStatusText(`Error: ${error.message}`);
+            setIsProcessing(false);
+        }
+    };
+
+    return (
+        <main className="min-h-screen bg-slate-950">
+            <Navbar />
+
+            <div className="container mx-auto px-4 pt-28 pb-12">
+                {isProcessing ? (
+                    <ProcessingView steps={steps} currentStep={currentStep} statusText={statusText} />
+                ) : (
+                    <div className="max-w-6xl mx-auto animate-fade-in-up">
+                        {/* Header */}
+                        <div className="text-center mb-12">
+                            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4">
+                                <span className="bg-gradient-to-r from-white via-violet-100 to-fuchsia-200 bg-clip-text text-transparent">
+                                    Analyze Your Resume
+                                </span>
+                            </h1>
+                            <p className="text-slate-400 text-lg">Get AI-powered feedback in seconds</p>
+                        </div>
+
+                        {/* Split View */}
+                        <form onSubmit={handleSubmit} className="grid md:grid-cols-2 gap-8">
+                            {/* Left: Form */}
+                            <div className="space-y-6">
+                                <div>
+                                    <label htmlFor="company-name" className="block text-sm font-medium text-slate-300 mb-2">
+                                        Company Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="company-name"
+                                        id="company-name"
+                                        placeholder="e.g. Google"
+                                        required
+                                        className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="job-title" className="block text-sm font-medium text-slate-300 mb-2">
+                                        Job Title
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="job-title"
+                                        id="job-title"
+                                        placeholder="e.g. Senior Software Engineer"
+                                        required
+                                        className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label htmlFor="job-description" className="block text-sm font-medium text-slate-300 mb-2">
+                                        Job Description
+                                    </label>
+                                    <textarea
+                                        name="job-description"
+                                        id="job-description"
+                                        rows={8}
+                                        placeholder="Paste the full job description here..."
+                                        required
+                                        className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all resize-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Right: File Drop Zone */}
+                            <div className="flex flex-col gap-6">
+                                <div
+                                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={handleDrop}
+                                    className={`flex-1 border-2 border-dashed rounded-2xl transition-all duration-300 flex flex-col items-center justify-center p-8 ${isDragging
+                                        ? 'border-violet-500 bg-violet-500/10'
+                                        : file
+                                            ? 'border-emerald-500 bg-emerald-500/10'
+                                            : 'border-white/10 bg-slate-900/30 hover:border-white/20'
+                                        }`}
+                                >
+                                    {file ? (
+                                        <div
+                                            initial={{ scale: 0.8, opacity: 0 }}
+                                            animate={{ scale: 1, opacity: 1 }}
+                                            className="text-center"
+                                        >
+                                            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                                <FileText className="w-8 h-8 text-emerald-400" />
+                                            </div>
+                                            <p className="text-white font-semibold mb-1">{file.name}</p>
+                                            <p className="text-sm text-slate-400">{(file.size / 1024).toFixed(1)} KB</p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFile(null)}
+                                                className="mt-4 text-sm text-rose-400 hover:text-rose-300 transition-colors"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="w-16 h-16 mb-4 rounded-full bg-violet-500/20 flex items-center justify-center">
+                                                <Upload className="w-8 h-8 text-violet-400" />
+                                            </div>
+                                            <p className="text-white font-semibold mb-2">Drop your resume here</p>
+                                            <p className="text-sm text-slate-400 mb-4">or click to browse</p>
+                                            <input
+                                                type="file"
+                                                accept=".pdf"
+                                                onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+                                                className="hidden"
+                                                id="file-input"
+                                            />
+                                            <label htmlFor="file-input">
+                                                <span className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg cursor-pointer transition-colors inline-block">
+                                                    Select PDF
+                                                </span>
+                                            </label>
+                                        </>
+                                    )}
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    variant="primary"
+                                    size="lg"
+                                    disabled={!file}
+                                    className="w-full"
+                                >
+                                    <Sparkles className="w-5 h-5 mr-2" />
+                                    Analyze Resume
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                )}
+            </div>
+        </main>
+    );
+};
+
+// Processing Pipeline Visualization
+const ProcessingView = ({ steps, currentStep, statusText }: any) => (
+    <div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="max-w-2xl mx-auto text-center"
+    >
+        <div className="mb-12">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 flex items-center justify-center">
+                <Loader2 className="w-10 h-10 text-white animate-spin" />
+            </div>
+            <h2 className="text-3xl font-bold text-white mb-2">{statusText}</h2>
+            <p className="text-slate-400">This usually takes 10-20 seconds</p>
+        </div>
+
+        <div className="space-y-4">
+            {steps.map((step: any, index: number) => {
+                const Icon = step.icon;
+                const isComplete = index < currentStep;
+                const isCurrent = index === currentStep;
+
+                return (
+                    <div
+                        key={index}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${isComplete
+                            ? 'bg-emerald-500/10 border-emerald-500/30'
+                            : isCurrent
+                                ? 'bg-violet-500/10 border-violet-500/30'
+                                : 'bg-slate-900/30 border-white/5'
+                            }`}
+                    >
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isComplete
+                            ? 'bg-emerald-500'
+                            : isCurrent
+                                ? 'bg-violet-500'
+                                : 'bg-slate-800'
+                            }`}>
+                            {isComplete ? (
+                                <CheckCircle2 className="w-5 h-5 text-white" />
+                            ) : (
+                                <Icon className={`w-5 h-5 ${isCurrent ? 'text-white' : 'text-slate-500'}`} />
+                            )}
+                        </div>
+                        <span className={`font-medium ${isComplete || isCurrent ? 'text-white' : 'text-slate-500'
+                            }`}>
+                            {step.label}
+                        </span>
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+);
+
+export default UploadPage;
