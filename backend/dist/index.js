@@ -25,7 +25,9 @@ const port = process.env.PORT || 3000;
 // Initialize Supabase Admin client
 const supabaseUrl = process.env.SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabaseAdmin = (0, supabase_js_1.createClient)(supabaseUrl, supabaseServiceKey);
+const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
+    ? (0, supabase_js_1.createClient)(supabaseUrl, supabaseServiceKey)
+    : null;
 app.use((0, cors_1.default)()); // Configure this more strictly for production if needed
 app.use(express_1.default.json({ limit: '10mb' }));
 app.get('/health', (req, res) => {
@@ -61,7 +63,7 @@ app.post('/analyze', apiLimiter, (req, res) => __awaiter(void 0, void 0, void 0,
             resumeText,
         });
         // Update Database directly from Backend safely via Service Role
-        if (supabaseUrl && supabaseServiceKey) {
+        if (supabaseAdmin) {
             const { error: dbError } = yield supabaseAdmin
                 .from('resumes')
                 .update({ feedback })
