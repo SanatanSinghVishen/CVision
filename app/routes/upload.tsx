@@ -90,6 +90,11 @@ const UploadPage = () => {
             // 2. Convert PDF & Extract Text
             setCurrentStep(0);
             setStatusText('Processing PDF...');
+            
+            const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+            if (file.size > MAX_FILE_SIZE) {
+                throw new Error("File exceeds 5MB limit. Please compress your PDF.");
+            }
             const imageResult = await convertPdfToImage(file);
             if (!imageResult.file) {
                 const errorMsg = imageResult.error || "PDF Conversion Failed";
@@ -147,7 +152,8 @@ const UploadPage = () => {
                 body: JSON.stringify({
                     jobTitle,
                     jobDescription,
-                    resumeText
+                    resumeText,
+                    resumeId: resumeData.id
                 })
             });
 
@@ -159,23 +165,9 @@ const UploadPage = () => {
             const { feedback, error: apiError } = await response.json();
             if (apiError) throw new Error(apiError);
 
-            // 6. Update DB with Feedback
+            // 6. Navigate to Results
             setCurrentStep(3);
-            console.log("Upload: Attempting to save feedback:", feedback);
-            const { data: updateData, error: updateError } = await supabase
-                .from('resumes')
-                .update({ feedback })
-                .eq('id', resumeData.id)
-                .select();
-
-            if (updateError) throw new Error(`Failed to save feedback: ${updateError.message}`);
-
-            if (!updateData || updateData.length === 0) {
-                console.error("Upload: Update returned no rows. Possible RLS issue.");
-                throw new Error("Database Save Failed (Permission Denied). Please check Supabase policies.");
-            }
-
-            console.log("Upload: Feedback saved successfully.", updateData);
+            console.log("Upload: Feedback processed successfully by backend.");
 
             // 7. Done
             navigate(`/resume/${resumeData.id}`);
