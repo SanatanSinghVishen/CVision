@@ -170,7 +170,7 @@ const UploadPage = () => {
             console.log("Upload: Feedback processed successfully by backend.");
 
             // 7. Done
-            navigate(`/resume/${resumeData.id}`);
+            navigate(`/resume/${resumeData.id}`, { state: { feedback } });
 
         } catch (error: any) {
             console.error("Upload Logic Error:", error);

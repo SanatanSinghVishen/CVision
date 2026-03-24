@@ -1,4 +1,4 @@
-import { Link, redirect, useParams, useNavigate } from "react-router";
+import { Link, redirect, useParams, useNavigate, useLocation } from "react-router";
 import Summary from "~/components/Summary";
 import ATS from "~/components/ATS";
 import Details from "~/components/Details";
@@ -19,6 +19,8 @@ export const meta = () => ([
 const Resume = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    
     const [resume, setResume] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [imagePublicUrl, setImagePublicUrl] = useState<string | null>(null);
@@ -97,7 +99,7 @@ const Resume = () => {
         );
     }
 
-    const feedback = resume.feedback;
+    const feedback = resume.feedback || location.state?.feedback;
 
     return (
         <main className="min-h-screen bg-slate-950">
