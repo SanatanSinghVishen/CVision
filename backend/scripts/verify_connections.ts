@@ -13,7 +13,7 @@ async function main() {
             const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
             const completion = await groq.chat.completions.create({
                 messages: [{ role: "user", content: "Ping" }],
-                model: "llama-3.2-11b-vision-preview",
+                model: "llama-3.3-70b-versatile",
             });
             console.log("✅ Groq Connection: Success");
         } catch (error: any) {
@@ -21,14 +21,17 @@ async function main() {
         }
     }
 
-    // 2. Check Supabase
-    if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY) {
-        console.error("❌ Supabase keys missing.");
+    // 2. Check Supabase (using backend env vars)
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+        console.error("❌ Supabase keys missing. (Checked SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)");
     } else {
         try {
             const supabase = createClient(
-                process.env.VITE_SUPABASE_URL,
-                process.env.VITE_SUPABASE_ANON_KEY
+                supabaseUrl,
+                supabaseKey
             );
             const { data, error } = await supabase.from("resumes").select("count", { count: "exact", head: true });
 

@@ -11,7 +11,7 @@
     "build",
     "dist",
     "scripts",
-    "verify_connections.ts"
+    "backend/scripts/verify_connections.ts"
   ],
   "compilerOptions": {
     "lib": [
