@@ -13,25 +13,17 @@ if (!apiKey) {
 const groq = new Groq({ apiKey });
 
 async function main() {
-    console.log("Testing Groq Model: meta-llama/llama-4-scout-17b-16e-instruct");
+    console.log("Testing Groq Model: llama-3.3-70b-versatile (Text Completion)");
 
     try {
         const completion = await groq.chat.completions.create({
             messages: [
                 {
                     role: "user",
-                    content: [
-                        { type: "text", text: "Describe this image." },
-                        {
-                            type: "image_url",
-                            image_url: {
-                                "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
-                            },
-                        },
-                    ],
+                    content: "Ping! Are you receiving this?",
                 },
             ],
-            model: "meta-llama/llama-4-scout-17b-16e-instruct",
+            model: "llama-3.3-70b-versatile",
         });
 
         console.log("Success!");
