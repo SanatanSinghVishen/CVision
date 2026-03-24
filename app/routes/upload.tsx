@@ -14,8 +14,6 @@ export const meta: MetaFunction = () => {
     ];
 };
 
-// export const loader = async () => null;
-
 const UploadPage = () => {
     const navigate = useNavigate();
     const [statusText, setStatusText] = useState('');
@@ -30,24 +28,6 @@ const UploadPage = () => {
         { label: "AI Analysis", icon: Sparkles },
         { label: "Saving Results", icon: CheckCircle2 }
     ];
-
-    useEffect(() => {
-        // Initial check using getSession to avoid race conditions
-        const checkAuth = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                navigate('/auth');
-            }
-        };
-        checkAuth();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_OUT') {
-                navigate('/auth');
-            }
-        });
-        return () => subscription.unsubscribe();
-    }, [navigate]);
 
     const handleFileSelect = (selectedFile: File | null) => {
         setFile(selectedFile);
@@ -75,18 +55,8 @@ const UploadPage = () => {
         setStatusText('Starting Analysis...');
 
         try {
-            // 1. Auth Check
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                navigate('/auth');
-                return;
-            }
-
-            // Keep the manual check in submit just in case, or rely on RLS.
-            // But we need to remove the initial check block that was causing issues if we rely on useEffect.
-            // Ideally, we just check session existence inside submit.
-
-
+            
             // 2. Convert PDF & Extract Text
             setCurrentStep(0);
             setStatusText('Processing PDF...');
@@ -102,42 +72,43 @@ const UploadPage = () => {
             }
             const resumeText = await extractTextFromPdf(file);
 
-            // 3. Upload to Supabase Storage
+            // 3. Upload to Supabase Storage (Conditionally for Authenticated Users)
             setCurrentStep(1);
-            setStatusText('Uploading Files...');
-            const timestamp = Date.now();
-            const resumePath = `${session.user.id}/${timestamp}_${file.name}`;
-            const imagePath = `${session.user.id}/${timestamp}_${imageResult.file.name}`;
+            let targetResumeId = crypto.randomUUID(); // Generic valid UUID for Zod bypass
+            
+            if (session) {
+                setStatusText('Uploading Files to Dashboard...');
+                const timestamp = Date.now();
+                const resumePath = `${session.user.id}/${timestamp}_${file.name}`;
+                const imagePath = `${session.user.id}/${timestamp}_${imageResult.file.name}`;
 
-            const { error: resumeError } = await supabase.storage
-                .from('resumes')
-                .upload(resumePath, file);
-            if (resumeError) throw new Error(`Resume Upload Failed: ${resumeError.message}`);
+                const { error: resumeError } = await supabase.storage.from('resumes').upload(resumePath, file);
+                if (resumeError) throw new Error(`Resume Upload Failed: ${resumeError.message}`);
 
+                const { error: imageError } = await supabase.storage.from('resumes').upload(imagePath, imageResult.file);
+                if (imageError) throw new Error(`Image Upload Failed: ${imageError.message}`);
 
-            const { error: imageError } = await supabase.storage
-                .from('resumes')
-                .upload(imagePath, imageResult.file);
-            if (imageError) throw new Error(`Image Upload Failed: ${imageError.message}`);
+                // 4. Initial DB Insert
+                setStatusText('Saving Resume Data...');
+                const { data: dbData, error: dbError } = await supabase
+                    .from('resumes')
+                    .insert({
+                        user_id: session.user.id,
+                        company_name: companyName,
+                        job_title: jobTitle,
+                        job_description: jobDescription,
+                        resume_path: resumePath,
+                        image_path: imagePath,
+                        feedback: null
+                    })
+                    .select()
+                    .single();
 
-
-            // 4. Initial DB Insert
-            setStatusText('Saving Resume Data...');
-            const { data: resumeData, error: dbError } = await supabase
-                .from('resumes')
-                .insert({
-                    user_id: session.user.id,
-                    company_name: companyName,
-                    job_title: jobTitle,
-                    job_description: jobDescription,
-                    resume_path: resumePath,
-                    image_path: imagePath,
-                    feedback: null
-                })
-                .select()
-                .single();
-
-            if (dbError) throw new Error(`DB Save Failed: ${dbError.message}`);
+                if (dbError) throw new Error(`DB Save Failed: ${dbError.message}`);
+                targetResumeId = dbData.id;
+            } else {
+                setStatusText('Guest User: Skipping Storage...');
+            }
 
             // 5. Call AI API
             setCurrentStep(2);
@@ -146,14 +117,12 @@ const UploadPage = () => {
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
             const response = await fetch(`${apiUrl}/analyze`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     jobTitle,
                     jobDescription,
                     resumeText,
-                    resumeId: resumeData.id
+                    resumeId: targetResumeId
                 })
             });
 
@@ -167,10 +136,10 @@ const UploadPage = () => {
 
             // 6. Navigate to Results
             setCurrentStep(3);
-            console.log("Upload: Feedback processed successfully by backend.");
+            console.log("Upload: Feedback processed successfully.");
 
             // 7. Done
-            navigate(`/resume/${resumeData.id}`, { state: { feedback } });
+            navigate(`/resume/${targetResumeId}`, { state: { feedback, guestMode: !session } });
 
         } catch (error: any) {
             console.error("Upload Logic Error:", error);
@@ -180,7 +149,7 @@ const UploadPage = () => {
     };
 
     return (
-        <main className="min-h-screen bg-slate-950">
+        <main className="min-h-screen bg-slate-50 text-slate-900 font-sans">
             <Navbar />
 
             <div className="container mx-auto px-4 pt-28 pb-12">
@@ -190,12 +159,12 @@ const UploadPage = () => {
                     <div className="max-w-6xl mx-auto animate-fade-in-up">
                         {/* Header */}
                         <div className="text-center mb-12">
-                            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4">
-                                <span className="bg-gradient-to-r from-white via-violet-100 to-fuchsia-200 bg-clip-text text-transparent">
+                            <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-4">
+                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-600">
                                     Analyze Your Resume
                                 </span>
                             </h1>
-                            <p className="text-slate-400 text-lg">Get AI-powered feedback in seconds</p>
+                            <p className="text-slate-500 text-lg font-medium">Get AI-powered feedback in seconds</p>
                         </div>
 
                         {/* Split View */}
@@ -203,7 +172,7 @@ const UploadPage = () => {
                             {/* Left: Form */}
                             <div className="space-y-6">
                                 <div>
-                                    <label htmlFor="company-name" className="block text-sm font-medium text-slate-300 mb-2">
+                                    <label htmlFor="company-name" className="block text-sm font-bold text-slate-700 mb-2">
                                         Company Name
                                     </label>
                                     <input
@@ -212,12 +181,12 @@ const UploadPage = () => {
                                         id="company-name"
                                         placeholder="e.g. Google"
                                         required
-                                        className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
+                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all font-medium shadow-sm"
                                     />
                                 </div>
 
                                 <div>
-                                    <label htmlFor="job-title" className="block text-sm font-medium text-slate-300 mb-2">
+                                    <label htmlFor="job-title" className="block text-sm font-bold text-slate-700 mb-2">
                                         Job Title
                                     </label>
                                     <input
@@ -226,12 +195,12 @@ const UploadPage = () => {
                                         id="job-title"
                                         placeholder="e.g. Senior Software Engineer"
                                         required
-                                        className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all"
+                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all font-medium shadow-sm"
                                     />
                                 </div>
 
                                 <div>
-                                    <label htmlFor="job-description" className="block text-sm font-medium text-slate-300 mb-2">
+                                    <label htmlFor="job-description" className="block text-sm font-bold text-slate-700 mb-2">
                                         Job Description
                                     </label>
                                     <textarea
@@ -240,7 +209,7 @@ const UploadPage = () => {
                                         rows={8}
                                         placeholder="Paste the full job description here..."
                                         required
-                                        className="w-full px-4 py-3 bg-slate-900/50 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all resize-none"
+                                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all resize-none shadow-sm font-medium"
                                     />
                                 </div>
                             </div>
@@ -251,37 +220,35 @@ const UploadPage = () => {
                                     onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                                     onDragLeave={() => setIsDragging(false)}
                                     onDrop={handleDrop}
-                                    className={`flex-1 border-2 border-dashed rounded-2xl transition-all duration-300 flex flex-col items-center justify-center p-8 ${isDragging
-                                        ? 'border-violet-500 bg-violet-500/10'
+                                    className={`flex-1 border-2 border-dashed rounded-2xl transition-all duration-300 flex flex-col items-center justify-center p-8 bg-white ${isDragging
+                                        ? 'border-violet-500 bg-violet-50 shadow-inner'
                                         : file
-                                            ? 'border-emerald-500 bg-emerald-500/10'
-                                            : 'border-white/10 bg-slate-900/30 hover:border-white/20'
+                                            ? 'border-emerald-500 bg-emerald-50 shadow-inner'
+                                            : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50 shadow-sm'
                                         }`}
                                 >
                                     {file ? (
-                                        <div
-                                            className="text-center"
-                                        >
-                                            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                                                <FileText className="w-8 h-8 text-emerald-400" />
+                                        <div className="text-center">
+                                            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-100 flex items-center justify-center">
+                                                <FileText className="w-8 h-8 text-emerald-600" />
                                             </div>
-                                            <p className="text-white font-semibold mb-1">{file.name}</p>
-                                            <p className="text-sm text-slate-400">{(file.size / 1024).toFixed(1)} KB</p>
+                                            <p className="text-slate-900 font-bold mb-1">{file.name}</p>
+                                            <p className="text-sm text-slate-500 font-medium">{(file.size / 1024).toFixed(1)} KB</p>
                                             <button
                                                 type="button"
                                                 onClick={() => setFile(null)}
-                                                className="mt-4 text-sm text-rose-400 hover:text-rose-300 transition-colors"
+                                                className="mt-4 text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors"
                                             >
-                                                Remove
+                                                Remove File
                                             </button>
                                         </div>
                                     ) : (
                                         <>
-                                            <div className="w-16 h-16 mb-4 rounded-full bg-violet-500/20 flex items-center justify-center">
-                                                <Upload className="w-8 h-8 text-violet-400" />
+                                            <div className="w-16 h-16 mb-4 rounded-full bg-violet-100 flex items-center justify-center">
+                                                <Upload className="w-8 h-8 text-violet-600" />
                                             </div>
-                                            <p className="text-white font-semibold mb-2">Drop your resume here</p>
-                                            <p className="text-sm text-slate-400 mb-4">or click to browse</p>
+                                            <p className="text-slate-900 font-bold mb-2">Drop your resume here</p>
+                                            <p className="text-sm text-slate-500 font-medium mb-4">or click to browse</p>
                                             <input
                                                 type="file"
                                                 accept=".pdf"
@@ -290,7 +257,7 @@ const UploadPage = () => {
                                                 id="file-input"
                                             />
                                             <label htmlFor="file-input">
-                                                <span className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg cursor-pointer transition-colors inline-block">
+                                                <span className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg cursor-pointer transition-colors inline-block pointer-events-auto shadow-sm">
                                                     Select PDF
                                                 </span>
                                             </label>
@@ -303,7 +270,7 @@ const UploadPage = () => {
                                     variant="primary"
                                     size="lg"
                                     disabled={!file}
-                                    className="w-full"
+                                    className="w-full bg-slate-900 hover:bg-slate-800 text-white shadow-md font-bold"
                                 >
                                     <Sparkles className="w-5 h-5 mr-2" />
                                     Analyze Resume
@@ -319,16 +286,13 @@ const UploadPage = () => {
 
 // Processing Pipeline Visualization
 const ProcessingView = ({ steps, currentStep, statusText }: any) => (
-    <div
-
-        className="max-w-2xl mx-auto text-center"
-    >
+    <div className="max-w-2xl mx-auto text-center mt-12">
         <div className="mb-12">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 flex items-center justify-center">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg">
                 <Loader2 className="w-10 h-10 text-white animate-spin" />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-2">{statusText}</h2>
-            <p className="text-slate-400">This usually takes 10-20 seconds</p>
+            <h2 className="text-3xl font-extrabold text-slate-900 mb-2">{statusText}</h2>
+            <p className="text-slate-500 font-medium">This usually takes 10-20 seconds</p>
         </div>
 
         <div className="space-y-4">
@@ -340,26 +304,26 @@ const ProcessingView = ({ steps, currentStep, statusText }: any) => (
                 return (
                     <div
                         key={index}
-                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${isComplete
-                            ? 'bg-emerald-500/10 border-emerald-500/30'
+                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${isComplete
+                            ? 'bg-emerald-50 border-emerald-200'
                             : isCurrent
-                                ? 'bg-violet-500/10 border-violet-500/30'
-                                : 'bg-slate-900/30 border-white/5'
+                                ? 'bg-violet-50 border-violet-200 shadow-sm'
+                                : 'bg-white border-slate-200 opacity-50'
                             }`}
                     >
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isComplete
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${isComplete
                             ? 'bg-emerald-500'
                             : isCurrent
                                 ? 'bg-violet-500'
-                                : 'bg-slate-800'
+                                : 'bg-slate-100'
                             }`}>
                             {isComplete ? (
-                                <CheckCircle2 className="w-5 h-5 text-white" />
+                                <CheckCircle2 className="w-6 h-6 text-white" />
                             ) : (
-                                <Icon className={`w-5 h-5 ${isCurrent ? 'text-white' : 'text-slate-500'}`} />
+                                <Icon className={`w-6 h-6 ${isCurrent ? 'text-white' : 'text-slate-400'}`} />
                             )}
                         </div>
-                        <span className={`font-medium ${isComplete || isCurrent ? 'text-white' : 'text-slate-500'
+                        <span className={`font-bold ${isComplete || isCurrent ? 'text-slate-900' : 'text-slate-400'
                             }`}>
                             {step.label}
                         </span>

@@ -16,7 +16,7 @@ const CategoryHeader = ({
 }) => {
   return (
     <div className="flex flex-row gap-4 items-center py-2 w-full">
-      <p className="text-xl font-semibold text-white">{title}</p>
+      <p className="text-xl font-bold text-slate-900 group-hover:text-violet-700 transition-colors">{title}</p>
       <div className="ml-auto">
         <ScoreBadge score={categoryScore} />
       </div>
@@ -31,43 +31,45 @@ const CategoryContent = ({
 }) => {
   return (
     <div className="flex flex-col gap-6 w-full pt-4">
-      <div className="bg-slate-800/50 w-full rounded-xl p-6 grid grid-cols-1 md:grid-cols-2 gap-4 border border-slate-700/50">
+      <div className="bg-slate-50 w-full rounded-2xl p-6 grid grid-cols-1 md:grid-cols-2 gap-5 border border-slate-200 shadow-sm">
         {tips.map((tip, index) => (
-          <div className="flex flex-row gap-3 items-start" key={index}>
-            <div className={`mt-1 flex-shrink-0 ${tip.type === "good" ? "text-emerald-400" : "text-amber-400"}`}>
+          <div className="flex flex-row gap-4 items-start bg-white p-4 rounded-xl border border-slate-100 shadow-sm" key={index}>
+            <div className={`mt-0.5 flex-shrink-0 ${tip.type === "good" ? "text-emerald-500" : "text-amber-500"}`}>
               {tip.type === "good"
-                ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
               }
             </div>
-            <p className="text-slate-300 text-sm leading-relaxed">{tip.tip}</p>
+            <p className="text-slate-700 font-medium text-sm leading-relaxed">{tip.tip}</p>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-col gap-4 w-full">
+      <div className="flex flex-col gap-5 w-full">
         {tips.map((tip, index) => (
           <div
             key={index + tip.tip}
             className={cn(
-              "flex flex-col gap-2 rounded-xl p-5 border",
+              "flex flex-col gap-3 rounded-2xl p-6 border shadow-sm",
               tip.type === "good"
-                ? "bg-emerald-500/5 border-emerald-500/20"
-                : "bg-amber-500/5 border-amber-500/20"
+                ? "bg-emerald-50 border-emerald-200"
+                : "bg-amber-50 border-amber-200"
             )}
           >
             <div className="flex flex-row gap-3 items-center">
-              <div className={tip.type === "good" ? "text-emerald-400" : "text-amber-400"}>
+              <div className={tip.type === "good" ? "text-emerald-600" : "text-amber-600"}>
                 {tip.type === "good"
-                  ? <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
-                  : <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                  ? <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                  : <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                 }
               </div>
-              <p className={`text-lg font-semibold ${tip.type === "good" ? "text-emerald-100" : "text-amber-100"}`}>
+              <p className={`text-lg font-bold ${tip.type === "good" ? "text-emerald-900" : "text-amber-900"}`}>
                 {tip.tip}
               </p>
             </div>
-            <p className="text-slate-400 text-sm leading-relaxed pl-8">{tip.explanation}</p>
+            <p className={`text-sm font-medium leading-relaxed pl-9 ${tip.type === "good" ? "text-emerald-800/80" : "text-amber-800/80"}`}>
+                {tip.explanation}
+            </p>
           </div>
         ))}
       </div>
@@ -76,11 +78,10 @@ const CategoryContent = ({
 };
 
 const Details = ({ feedback }: { feedback: any }) => {
-  // Safety check - if feedback doesn't have the expected structure, show a message
   if (!feedback?.toneAndStyle && !feedback?.content && !feedback?.structure && !feedback?.skills) {
     return (
-      <div className="glass-card p-8 text-center">
-        <p className="text-slate-400">
+      <div className="bg-white border border-slate-200 shadow-sm rounded-3xl p-8 text-center">
+        <p className="text-slate-500 font-medium">
           This resume was analyzed with an older version. Please upload it again to see detailed feedback.
         </p>
       </div>
@@ -88,21 +89,20 @@ const Details = ({ feedback }: { feedback: any }) => {
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full">
+    <div className="flex flex-col gap-5 w-full">
+      <h2 className="text-2xl font-extrabold text-slate-900 my-2 px-2">Detailed Breakdown</h2>
+      
       <Accordion>
-        {/* Glass card wrapper for each item could be handled here or in Accordion styles. 
-              Assuming AccordionItem just renders children, we add styling there. */}
-
         {feedback.toneAndStyle && (
-          <div className="glass-card mb-4 overflow-hidden p-0">
+          <div className="bg-white border border-slate-200 shadow-sm rounded-3xl mb-4 overflow-hidden group transition-all hover:border-violet-300">
             <AccordionItem id="tone-style">
-              <AccordionHeader itemId="tone-style" className="px-6 py-4 hover:bg-white/5 transition-colors border-b border-white/5">
+              <AccordionHeader itemId="tone-style" className="px-8 py-5 hover:bg-slate-50 transition-colors border-b border-slate-100">
                 <CategoryHeader
                   title="Tone & Style"
                   categoryScore={feedback.toneAndStyle.score}
                 />
               </AccordionHeader>
-              <AccordionContent itemId="tone-style" className="px-6 pb-6">
+              <AccordionContent itemId="tone-style" className="px-8 pb-8 bg-white">
                 <CategoryContent tips={feedback.toneAndStyle.tips} />
               </AccordionContent>
             </AccordionItem>
@@ -110,15 +110,15 @@ const Details = ({ feedback }: { feedback: any }) => {
         )}
 
         {feedback.content && (
-          <div className="glass-card mb-4 overflow-hidden p-0">
+          <div className="bg-white border border-slate-200 shadow-sm rounded-3xl mb-4 overflow-hidden group transition-all hover:border-violet-300">
             <AccordionItem id="content">
-              <AccordionHeader itemId="content" className="px-6 py-4 hover:bg-white/5 transition-colors border-b border-white/5">
+              <AccordionHeader itemId="content" className="px-8 py-5 hover:bg-slate-50 transition-colors border-b border-slate-100">
                 <CategoryHeader
                   title="Content"
                   categoryScore={feedback.content.score}
                 />
               </AccordionHeader>
-              <AccordionContent itemId="content" className="px-6 pb-6">
+              <AccordionContent itemId="content" className="px-8 pb-8 bg-white">
                 <CategoryContent tips={feedback.content.tips} />
               </AccordionContent>
             </AccordionItem>
@@ -126,15 +126,15 @@ const Details = ({ feedback }: { feedback: any }) => {
         )}
 
         {feedback.structure && (
-          <div className="glass-card mb-4 overflow-hidden p-0">
+          <div className="bg-white border border-slate-200 shadow-sm rounded-3xl mb-4 overflow-hidden group transition-all hover:border-violet-300">
             <AccordionItem id="structure">
-              <AccordionHeader itemId="structure" className="px-6 py-4 hover:bg-white/5 transition-colors border-b border-white/5">
+              <AccordionHeader itemId="structure" className="px-8 py-5 hover:bg-slate-50 transition-colors border-b border-slate-100">
                 <CategoryHeader
                   title="Structure"
                   categoryScore={feedback.structure.score}
                 />
               </AccordionHeader>
-              <AccordionContent itemId="structure" className="px-6 pb-6">
+              <AccordionContent itemId="structure" className="px-8 pb-8 bg-white">
                 <CategoryContent tips={feedback.structure.tips} />
               </AccordionContent>
             </AccordionItem>
@@ -142,15 +142,15 @@ const Details = ({ feedback }: { feedback: any }) => {
         )}
 
         {feedback.skills && (
-          <div className="glass-card mb-4 overflow-hidden p-0">
+          <div className="bg-white border border-slate-200 shadow-sm rounded-3xl mb-4 overflow-hidden group transition-all hover:border-violet-300">
             <AccordionItem id="skills">
-              <AccordionHeader itemId="skills" className="px-6 py-4 hover:bg-white/5 transition-colors border-b border-white/5">
+              <AccordionHeader itemId="skills" className="px-8 py-5 hover:bg-slate-50 transition-colors border-b border-slate-100">
                 <CategoryHeader
                   title="Skills"
                   categoryScore={feedback.skills.score}
                 />
               </AccordionHeader>
-              <AccordionContent itemId="skills" className="px-6 pb-6">
+              <AccordionContent itemId="skills" className="px-8 pb-8 bg-white">
                 <CategoryContent tips={feedback.skills.tips} />
               </AccordionContent>
             </AccordionItem>
