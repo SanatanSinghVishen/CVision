@@ -282,7 +282,7 @@ const Resume = () => {
             <Navbar />
 
             {/* Sticky Top Bar */}
-            <div className="sticky top-20 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm">
+            <div className="sticky top-[72px] z-40 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm">
                 <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <Link to={location.state?.guestMode ? "/" : "/dashboard"}
@@ -312,11 +312,11 @@ const Resume = () => {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="max-w-7xl mx-auto px-4 pt-8 pb-12">
                 <div className="grid lg:grid-cols-[340px_1fr] gap-8 items-start">
 
                     {/* ─── Left: Sticky Sidebar ────────────────── */}
-                    <aside className="lg:sticky lg:top-36 space-y-4">
+                    <aside className="lg:sticky lg:top-[144px] space-y-4">
                         {/* Overall Score Card */}
                         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm text-center">
                             <p className="text-xs font-extrabold text-slate-400 uppercase tracking-widest mb-4">Overall Score</p>
