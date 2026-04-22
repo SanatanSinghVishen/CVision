@@ -18,7 +18,12 @@ const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
     ? createClient(supabaseUrl, supabaseServiceKey) 
     : null;
 
-app.use(cors()); // Configure this more strictly for production if needed
+app.use(cors({
+    origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type'],
+}));
+
 app.use(express.json({ limit: '10mb' }));
 
 app.get('/health', (req, res) => {

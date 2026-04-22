@@ -57,3 +57,6 @@ Desktop.ini
 
 # Debug
 .vscode-test/
+
+# Backup files
+*.bak

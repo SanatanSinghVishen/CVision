@@ -195,7 +195,7 @@ const Resume = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const [resume, setResume] = useState<any>(null);
+    const [resume, setResume] = useState<ResumeRow | null>(null);
     const [loading, setLoading] = useState(true);
     const [imagePublicUrl, setImagePublicUrl] = useState<string | null>(null);
     const [resumePublicUrl, setResumePublicUrl] = useState<string | null>(null);
@@ -205,7 +205,16 @@ const Resume = () => {
         let mounted = true;
         const fetchResume = async () => {
             if (location.state?.guestMode && location.state?.feedback) {
-                setResume({ company_name: "Guest Analysis", job_title: "Temporary Analysis (not saved)", feedback: location.state.feedback });
+                setResume({
+                    id: '',
+                    user_id: '',
+                    company_name: "Guest Analysis",
+                    job_title: "Temporary Analysis (not saved)",
+                    resume_path: '',
+                    image_path: '',
+                    created_at: '',
+                    feedback: location.state.feedback as Feedback,
+                });
                 setLoading(false);
                 return;
             }
@@ -245,7 +254,7 @@ const Resume = () => {
         );
     }
 
-    const feedback = resume.feedback || location.state?.feedback;
+    const feedback: Feedback | null = resume?.feedback ?? (location.state?.feedback ?? null);
 
     if (!feedback) {
         return (
@@ -270,7 +279,7 @@ const Resume = () => {
         ? Math.round(catScores.reduce((a: number, b: number) => a + b, 0) / catScores.length)
         : feedback.ATS?.score || 0;
 
-    const categories = [
+    const categories: { key: keyof Pick<Feedback, 'toneAndStyle' | 'content' | 'structure' | 'skills'>; title: string; icon: any; accentColor: string }[] = [
         { key: 'toneAndStyle', title: 'Tone & Style', icon: Award, accentColor: 'bg-violet-100 text-violet-600' },
         { key: 'content', title: 'Content', icon: FileText, accentColor: 'bg-sky-100 text-sky-600' },
         { key: 'structure', title: 'Structure', icon: BarChart3, accentColor: 'bg-fuchsia-100 text-fuchsia-600' },

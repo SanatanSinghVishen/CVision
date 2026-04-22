@@ -2,7 +2,7 @@ import type { Route } from "./+types/home";
 import Navbar from "~/components/Navbar";
 import { Link, useNavigate } from "react-router";
 import { supabase } from "~/lib/supabase";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileText, TrendingUp, Award, Upload, ChevronRight } from "lucide-react";
 import Card from "~/components/Card";
 
@@ -14,7 +14,7 @@ export function meta({ }: Route.MetaArgs) {
 }
 
 export default function Home() {
-  const [resumes, setResumes] = useState<any[]>([]);
+  const [resumes, setResumes] = useState<ResumeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -147,8 +147,12 @@ const StatCard = ({ icon, label, value, gradient = false }: any) => (
   </Card>
 );
 
-const ResumeListItem = ({ resume }: any) => {
+const ResumeListItem = ({ resume }: { resume: ResumeRow }) => {
   const score = resume.feedback?.ATS?.score || 0;
+  const waveHeights = useMemo(
+    () => Array.from({ length: 8 }, () => Math.max(20, Math.random() * 100)),
+    [resume.id]
+  );
   const getScoreColor = (s: number) => {
     if (s >= 80) return "text-emerald-700 bg-emerald-100 border-emerald-200";
     if (s >= 60) return "text-amber-700 bg-amber-100 border-amber-200";
@@ -173,11 +177,11 @@ const ResumeListItem = ({ resume }: any) => {
 
           <div className="flex items-center gap-5">
             <div className="hidden md:flex items-center gap-1.5 h-8">
-              {[...Array(8)].map((_, i) => (
+              {waveHeights.map((h, i) => (
                 <div
                   key={i}
                   className="w-1.5 bg-violet-200 rounded-full"
-                  style={{ height: `${Math.max(20, Math.random() * 100)}%` }}
+                  style={{ height: `${h}%` }}
                 />
               ))}
             </div>

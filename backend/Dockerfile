@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-COPY tfconfig.json ./
+COPY tsconfig.json ./
 COPY src ./src
 
 # Create a tsconfig if it doesn't exist or just use tsc directly if simple

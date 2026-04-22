@@ -6,7 +6,6 @@ export const resumes: Resume[] = [
         imagePath: "/images/resume_01.png",
         resumePath: "/resumes/resume-1.pdf",
         feedback: {
-            overallScore: 85,
             ATS: {
                 score: 90,
                 tips: [],
@@ -36,7 +35,6 @@ export const resumes: Resume[] = [
         imagePath: "/images/resume_02.png",
         resumePath: "/resumes/resume-2.pdf",
         feedback: {
-            overallScore: 55,
             ATS: {
                 score: 90,
                 tips: [],
@@ -66,7 +64,6 @@ export const resumes: Resume[] = [
         imagePath: "/images/resume_03.png",
         resumePath: "/resumes/resume-3.pdf",
         feedback: {
-            overallScore: 75,
             ATS: {
                 score: 90,
                 tips: [],
@@ -96,7 +93,6 @@ export const resumes: Resume[] = [
         imagePath: "/images/resume_01.png",
         resumePath: "/resumes/resume-1.pdf",
         feedback: {
-            overallScore: 85,
             ATS: {
                 score: 90,
                 tips: [],
@@ -126,7 +122,6 @@ export const resumes: Resume[] = [
         imagePath: "/images/resume_02.png",
         resumePath: "/resumes/resume-2.pdf",
         feedback: {
-            overallScore: 55,
             ATS: {
                 score: 90,
                 tips: [],
@@ -156,7 +151,6 @@ export const resumes: Resume[] = [
         imagePath: "/images/resume_03.png",
         resumePath: "/resumes/resume-3.pdf",
         feedback: {
-            overallScore: 75,
             ATS: {
                 score: 90,
                 tips: [],
