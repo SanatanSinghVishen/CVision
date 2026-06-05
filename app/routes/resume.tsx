@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import {
     ArrowLeft, ExternalLink, ShieldAlert, TrendingUp, Target, Award,
     FileText, Zap, ChevronDown, ChevronUp, CheckCircle2, AlertTriangle,
-    BarChart3
+    BarChart3, MoveDown, RefreshCcw, Sparkles
 } from "lucide-react";
 import Navbar from "~/components/Navbar";
 
@@ -130,6 +130,80 @@ const CategoryPanel = ({ title, icon: Icon, score, tips, accentColor }: {
                     </div>
                 </div>
             )}
+        </div>
+    );
+};
+
+// ─── Actionable Insights Panel ───────────────────────────────────────
+const ActionableInsightsPanel = ({ updates, reordering }: { updates?: any[]; reordering?: string[] }) => {
+    if (!updates?.length && !reordering?.length) return null;
+
+    return (
+        <div className="bg-gradient-to-br from-indigo-50 to-fuchsia-50 border border-indigo-100 rounded-3xl shadow-sm overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                <Sparkles className="w-48 h-48 text-indigo-500" />
+            </div>
+            <div className="px-6 py-5 border-b border-indigo-100/50 flex items-center gap-4 bg-white/40 backdrop-blur-sm">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-fuchsia-500 flex items-center justify-center shadow-md">
+                    <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                    <h2 className="text-xl font-extrabold text-slate-900">Actionable Insights</h2>
+                    <p className="text-slate-500 font-medium text-xs mt-0.5">Tailored recommendations for this specific role</p>
+                </div>
+            </div>
+            
+            <div className="p-6 space-y-6 relative z-10">
+                {/* Section Updates */}
+                {updates && updates.length > 0 && (
+                    <div className="space-y-4">
+                        <h3 className="text-sm font-extrabold text-indigo-900 uppercase tracking-wider flex items-center gap-2">
+                            <RefreshCcw className="w-4 h-4 text-indigo-500" /> High-Impact Rewrites
+                        </h3>
+                        <div className="space-y-4">
+                            {updates.map((update, i) => (
+                                <div key={i} className="bg-white/80 backdrop-blur-md border border-indigo-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <span className="px-3 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg">{update.section}</span>
+                                    </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                            <p className="text-xs font-bold text-slate-400 mb-1 uppercase tracking-wide">Current Context</p>
+                                            <p className="text-slate-600 text-sm italic">"{update.currentContext}"</p>
+                                        </div>
+                                        <div className="bg-indigo-50/50 rounded-xl p-4 border border-indigo-200">
+                                            <p className="text-xs font-bold text-indigo-600 mb-1 uppercase tracking-wide flex items-center gap-1.5"><Sparkles className="w-3 h-3"/> Suggested Revision</p>
+                                            <p className="text-indigo-950 text-sm font-medium">"{update.suggestedRevision}"</p>
+                                        </div>
+                                    </div>
+                                    <p className="mt-4 text-sm text-slate-600 bg-white/50 rounded-xl p-4 border border-slate-100">
+                                        <span className="font-extrabold text-slate-800">Why this matters:</span> {update.reasoning}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Reordering */}
+                {reordering && reordering.length > 0 && (
+                    <div className="space-y-4 pt-6 border-t border-indigo-100/50">
+                        <h3 className="text-sm font-extrabold text-fuchsia-900 uppercase tracking-wider flex items-center gap-2">
+                            <MoveDown className="w-4 h-4 text-fuchsia-500" /> Layout & Ordering
+                        </h3>
+                        <ul className="space-y-3">
+                            {reordering.map((rec, i) => (
+                                <li key={i} className="flex items-start gap-4 bg-white/60 backdrop-blur-sm border border-fuchsia-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="mt-0.5 w-8 h-8 rounded-xl bg-fuchsia-100 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-fuchsia-700 text-sm font-extrabold">{i + 1}</span>
+                                    </div>
+                                    <p className="text-slate-800 text-sm font-medium mt-1.5">{rec}</p>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -275,9 +349,9 @@ const Resume = () => {
         feedback.toneAndStyle?.score, feedback.content?.score,
         feedback.structure?.score, feedback.skills?.score
     ].filter(Boolean);
-    const overallScore = catScores.length > 0
+    const overallScore = feedback.overallMatch || (catScores.length > 0
         ? Math.round(catScores.reduce((a: number, b: number) => a + b, 0) / catScores.length)
-        : feedback.ATS?.score || 0;
+        : feedback.ATS?.score || 0);
 
     const categories: { key: keyof Pick<Feedback, 'toneAndStyle' | 'content' | 'structure' | 'skills'>; title: string; icon: any; accentColor: string }[] = [
         { key: 'toneAndStyle', title: 'Tone & Style', icon: Award, accentColor: 'bg-violet-100 text-violet-600' },
@@ -398,6 +472,9 @@ const Resume = () => {
                                 </div>
                             ))}
                         </div>
+
+                        {/* Actionable Insights Panel */}
+                        <ActionableInsightsPanel updates={feedback.sectionUpdates} reordering={feedback.reorderingSuggestions} />
 
                         {/* ATS Panel */}
                         <ATSPanel score={feedback.ATS?.score || 0} tips={feedback.ATS?.tips || []} />

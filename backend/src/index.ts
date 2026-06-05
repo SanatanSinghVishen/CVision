@@ -39,6 +39,7 @@ const apiLimiter = rateLimit({
 
 // Zod schema for payload validation
 const analyzeSchema = z.object({
+    companyName: z.string().max(200, "Company name is too long (max 200 chars)"),
     jobTitle: z.string().max(200, "Job title is too long (max 200 chars)"),
     jobDescription: z.string().max(10000, "Job description is too long (max 10000 chars)"),
     resumeText: z.string().max(20000, "Resume text is too long (max 20000 chars)"),
@@ -56,9 +57,10 @@ app.post('/analyze', apiLimiter, async (req, res) => {
             });
         }
 
-        const { jobTitle, jobDescription, resumeText, resumeId } = parsedBody.data;
+        const { companyName, jobTitle, jobDescription, resumeText, resumeId } = parsedBody.data;
 
         const feedback = await analyzeResume({
+            companyName,
             jobTitle,
             jobDescription,
             resumeText,

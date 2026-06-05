@@ -20,8 +20,16 @@ interface CategoryFeedback {
 /** Full structured feedback returned by the AI */
 interface Feedback {
     summary?: string;
+    overallMatch?: number;
     strengths?: string[];
     weaknesses?: string[];
+    sectionUpdates?: {
+        section: string;
+        currentContext: string;
+        suggestedRevision: string;
+        reasoning: string;
+    }[];
+    reorderingSuggestions?: string[];
     recommendations?: string[];
     ATS: {
         score: number;
