@@ -19,19 +19,19 @@ const Button = ({
     disabled,
     ...props
 }: ButtonProps) => {
-    const baseStyles = 'inline-flex items-center justify-center font-bold transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed';
+    const baseStyles = 'inline-flex items-center justify-center font-medium transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variants = {
-        primary: 'bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white shadow-md shadow-violet-500/20 hover:shadow-lg hover:shadow-violet-500/30',
-        secondary: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 shadow-sm',
-        ghost: 'bg-transparent hover:bg-slate-100 text-slate-600 hover:text-slate-900',
-        glass: 'bg-white/60 backdrop-blur-md hover:bg-white/80 text-slate-800 border border-slate-200 shadow-sm'
+        primary: 'bg-[#6366F1] hover:bg-[#4F46E5] text-white shadow-[0_0_20px_rgba(99,102,241,0.15)]',
+        secondary: 'bg-[#1E1E24] hover:bg-[#27272A] text-[#F8F9FC] border border-[#27272A] hover:border-[#3F3F46]',
+        ghost: 'bg-transparent hover:bg-[#1E1E24] text-[#A1A1AA] hover:text-[#F8F9FC]',
+        glass: 'bg-[#13131A]/80 backdrop-blur-xl hover:bg-[#1E1E24] text-[#F8F9FC] border border-[#27272A]'
     };
 
     const sizes = {
         sm: 'px-4 py-2 text-sm rounded-lg',
         md: 'px-6 py-3 text-base rounded-xl',
-        lg: 'px-8 py-4 text-lg rounded-full'
+        lg: 'px-8 py-4 text-lg rounded-xl'
     };
 
     return (
@@ -54,3 +54,4 @@ const Button = ({
 };
 
 export default Button;
+

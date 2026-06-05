@@ -11,9 +11,9 @@ const ScoreGauge = ({ score }: { score: number }) => {
     }, [score]);
 
     const getColor = (s: number) => {
-        if (s >= 80) return { from: '#10b981', to: '#059669', text: 'text-emerald-400' };
-        if (s >= 60) return { from: '#f59e0b', to: '#d97706', text: 'text-amber-400' };
-        return { from: '#ef4444', to: '#dc2626', text: 'text-rose-400' };
+        if (s >= 80) return { from: '#10b981', to: '#059669', text: 'text-[#10B981]' };
+        if (s >= 60) return { from: '#f59e0b', to: '#d97706', text: 'text-[#F59E0B]' };
+        return { from: '#ef4444', to: '#dc2626', text: 'text-[#EF4444]' };
     };
 
     const color = getColor(score);
@@ -29,7 +29,7 @@ const ScoreGauge = ({ score }: { score: number }) => {
                     cy="80"
                     r="70"
                     fill="none"
-                    stroke="rgba(148, 163, 184, 0.1)"
+                    stroke="#27272A"
                     strokeWidth="12"
                 />
 
@@ -61,10 +61,11 @@ const ScoreGauge = ({ score }: { score: number }) => {
                 <span className={`text-4xl font-bold ${color.text} transition-all duration-500`}>
                     {Math.round(animatedScore)}
                 </span>
-                <span className="text-sm text-slate-500 font-medium">/ 100</span>
+                <span className="text-sm text-[#6B7280] font-medium">/ 100</span>
             </div>
         </div>
     );
 };
 
 export default ScoreGauge;
+

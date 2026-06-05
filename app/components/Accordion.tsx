@@ -98,7 +98,7 @@ export const AccordionHeader: React.FC<AccordionHeaderProps> = ({
 
     const defaultIcon = (
         <svg
-            className={cn("w-5 h-5 transition-transform duration-200 text-slate-400", {
+            className={cn("w-5 h-5 transition-transform duration-200 text-[#6B7280]", {
                 "rotate-180": isActive,
             })}
             fill="none"

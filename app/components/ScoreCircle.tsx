@@ -28,7 +28,7 @@ const ScoreCircle = ({ score = 75 }: { score: number }) => {
                     cx="50"
                     cy="50"
                     r={normalizedRadius}
-                    stroke="#334155"
+                    stroke="#27272A"
                     strokeWidth={stroke}
                     fill="transparent"
                     className="opacity-50"

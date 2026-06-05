@@ -2,29 +2,27 @@ import ScoreGauge from "~/components/ScoreGauge";
 import ScoreBadge from "~/components/ScoreBadge";
 
 const Category = ({ title, score }: { title: string, score: number }) => {
-    // Score Color Logic
     const getColorClass = (s: number) => {
-        if (s >= 80) return "text-emerald-600";
-        if (s >= 60) return "text-amber-600";
-        return "text-rose-600";
+        if (s >= 80) return "text-[#10B981]";
+        if (s >= 60) return "text-[#F59E0B]";
+        return "text-[#EF4444]";
     };
 
     return (
-        <div className="bg-slate-50 rounded-2xl p-4 flex items-center justify-between border border-slate-200 shadow-sm transition-all hover:border-slate-300">
+        <div className="bg-[#0A0A0F] rounded-2xl p-4 flex items-center justify-between border border-[#27272A] transition-all hover:border-[#3F3F46]">
             <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-slate-700">{title}</span>
+                <span className="text-lg font-bold text-[#F8F9FC]">{title}</span>
                 <ScoreBadge score={score} />
             </div>
-            <div className="text-xl font-extrabold flex items-baseline">
+            <div className="text-xl font-bold flex items-baseline">
                 <span className={getColorClass(score)}>{score}</span>
-                <span className="text-slate-400 font-medium text-sm ml-1">/100</span>
+                <span className="text-[#6B7280] font-medium text-sm ml-1">/100</span>
             </div>
         </div>
     )
 }
 
 const Summary = ({ feedback }: { feedback: any }) => {
-    // Calculate overall score from category scores
     const calculateOverallScore = () => {
         if (!feedback) return 0;
 
@@ -44,15 +42,15 @@ const Summary = ({ feedback }: { feedback: any }) => {
     const overallScore = calculateOverallScore();
 
     return (
-        <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex flex-col gap-6">
-            <div className="flex flex-row items-center gap-6 pb-6 border-b border-slate-100">
+        <div className="bg-[#13131A] border border-[#27272A] rounded-3xl p-8 flex flex-col gap-6">
+            <div className="flex flex-row items-center gap-6 pb-6 border-b border-[#27272A]">
                 <div className="transform scale-90 sm:scale-100 drop-shadow-sm">
                     <ScoreGauge score={overallScore} />
                 </div>
 
                 <div className="flex flex-col gap-1">
-                    <h2 className="text-3xl font-extrabold text-slate-900">Overall Score</h2>
-                    <p className="text-sm font-medium text-slate-500">
+                    <h2 className="text-3xl font-bold text-[#F8F9FC]">Overall Score</h2>
+                    <p className="text-sm font-medium text-[#A1A1AA]">
                         Based on industry standards and ATS algorithms.
                     </p>
                 </div>

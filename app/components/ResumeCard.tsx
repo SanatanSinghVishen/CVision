@@ -18,10 +18,10 @@ const ResumeCard = ({ resume: { id, companyName, jobTitle, feedback, imagePath }
         <Link to={`/resume/${id}`} className="resume-card-modern group animate-fade-in-up flex flex-col gap-6">
             <div className="flex justify-between items-start">
                 <div className="flex flex-col gap-1">
-                    <h2 className="!text-white !text-xl font-bold truncate max-w-[200px]" title={companyName}>
+                    <h2 className="!text-[#F8F9FC] !text-xl font-bold truncate max-w-[200px]" title={companyName}>
                         {companyName || "Unknown Company"}
                     </h2>
-                    <h3 className="text-slate-400 text-sm truncate max-w-[200px]" title={jobTitle}>
+                    <h3 className="text-[#A1A1AA] text-sm truncate max-w-[200px]" title={jobTitle}>
                         {jobTitle || "General Application"}
                     </h3>
                 </div>
@@ -30,7 +30,7 @@ const ResumeCard = ({ resume: { id, companyName, jobTitle, feedback, imagePath }
                 </div>
             </div>
 
-            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-white/10 bg-slate-900/50">
+            <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-[#27272A] bg-[#0A0A0F]">
                 {imageUrl ? (
                     <img
                         src={imageUrl}
@@ -42,8 +42,8 @@ const ResumeCard = ({ resume: { id, companyName, jobTitle, feedback, imagePath }
                         📄
                     </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-6">
-                    <span className="text-white font-medium px-4 py-2 bg-indigo-600/90 rounded-full text-sm backdrop-blur-sm">
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0F]/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-6">
+                    <span className="text-white font-medium px-4 py-2 bg-[#6366F1]/90 rounded-full text-sm backdrop-blur-sm">
                         View Analysis
                     </span>
                 </div>

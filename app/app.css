@@ -1,34 +1,35 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,100..900;1,100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @theme {
   --font-sans: "Inter", "Mona Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-  /* Premium Light Palette */
-  --color-bg-light: #f8fafc; /* Slate 50 */
-  --color-bg-card: #ffffff; /* White */
-  --color-border: #e2e8f0; /* Slate 200 */
-  --color-text-primary: #0f172a; /* Slate 900 */
-  --color-text-secondary: #64748b; /* Slate 500 */
+  /* CVision Premium Dark Palette */
+  --color-bg-base: #0A0A0F;
+  --color-bg-card: #13131A;
+  --color-border: #27272A; /* Zinc 800 */
+  --color-text-primary: #F8F9FC;
+  --color-text-secondary: #6B7280; /* Gray 500 */
 
-  --color-accent-primary: #8b5cf6; /* Violet 500 */
-  --color-accent-secondary: #d946ef; /* Fuchsia 500 */
+  --color-accent-primary: #6366F1; /* Indigo 500 */
+  --color-accent-hover: #4F46E5; /* Indigo 600 */
 
-  --color-status-success: #10b981;
-  --color-status-warning: #f59e0b;
-  --color-status-error: #ef4444;
+  --color-status-success: #10B981;
+  --color-status-warning: #F59E0B;
+  --color-status-error: #EF4444;
 
-  --animate-fade-in-up: fadeInUp 0.5s ease-out forwards;
+  --animate-fade-in-up: fadeInUp 0.4s ease-out forwards;
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 html,
 body {
-  background-color: var(--color-bg-light);
+  background-color: var(--color-bg-base);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   @apply antialiased overflow-x-hidden;
@@ -52,23 +53,24 @@ main {
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out forwards;
+  animation: var(--animate-fade-in-up);
 }
 
-/* Custom Scrollbar for Light Theme */
+/* Custom Scrollbar for Dark Theme */
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--color-bg-base);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #3F3F46; /* Zinc 700 */
 }
