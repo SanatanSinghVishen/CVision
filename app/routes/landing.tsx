@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import Navbar from "~/components/Navbar";
 import { supabase } from "~/lib/supabase";
-import { ArrowRight, CheckCircle2, Target, FileText, Briefcase, Zap, LineChart } from "lucide-react";
+import { ArrowRight, CheckCircle2, Target, FileText, Briefcase, Zap, LineChart, Github, Linkedin, Twitter } from "lucide-react";
 import { Card } from "~/components/ui/Card";
 
 export function meta() {
@@ -171,6 +171,45 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="py-12 border-t border-[#27272A] bg-[#0A0A0F]">
+        <div className="container mx-auto px-6 max-w-5xl flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-[#A1A1AA] text-sm">
+              Built with ❤️ by 
+              <span className="text-[#F8F9FC] font-medium ml-1">Sanatan Singh</span>
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <a 
+              href="https://github.com/SanatanSinghVishen" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full bg-[#13131A] border border-[#27272A] flex items-center justify-center text-[#A1A1AA] hover:text-[#F8F9FC] hover:border-[#6366F1] hover:bg-[#6366F1]/10 transition-all"
+            >
+              <Github className="w-5 h-5" />
+            </a>
+            <a 
+              href="https://www.linkedin.com/in/sanatan-singh-55b3502a3/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full bg-[#13131A] border border-[#27272A] flex items-center justify-center text-[#A1A1AA] hover:text-[#F8F9FC] hover:border-[#6366F1] hover:bg-[#6366F1]/10 transition-all"
+            >
+              <Linkedin className="w-5 h-5" />
+            </a>
+            <a 
+              href="https://x.com/sanatan_152" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full bg-[#13131A] border border-[#27272A] flex items-center justify-center text-[#A1A1AA] hover:text-[#F8F9FC] hover:border-[#6366F1] hover:bg-[#6366F1]/10 transition-all"
+            >
+              <Twitter className="w-5 h-5" />
+            </a>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }
