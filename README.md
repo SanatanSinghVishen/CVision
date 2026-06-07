@@ -8,8 +8,9 @@
 
 [![React](https://img.shields.io/badge/React-19.1.0-61DAFB?style=flat&logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.3.3-646CFF?style=flat&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Express](https://img.shields.io/badge/Express-4.18.2-000000?style=flat&logo=express&logoColor=white)](https://expressjs.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-Latest-3ECF8E?style=flat&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Redis](https://img.shields.io/badge/Redis-Upstash-DC382D?style=flat&logo=redis&logoColor=white)](https://upstash.com/)
 
 </div>
 
@@ -17,47 +18,42 @@
 
 ## 🌟 Overview
 
-**CVision** is a cutting-edge, AI-powered resume analysis platform that helps job seekers optimize their resumes for Applicant Tracking Systems (ATS) and stand out to recruiters. Built with modern web technologies and powered by advanced AI, CVision provides actionable insights to improve your chances of landing your dream job.
+**CVision** is a cutting-edge, AI-powered resume analysis platform that helps job seekers optimize their resumes for Applicant Tracking Systems (ATS) and stand out to recruiters. Built with modern web technologies, backed by a robust job-queue architecture, and powered by advanced AI, CVision provides actionable insights to improve your chances of landing your dream job.
 
 ### ✨ Key Features
 
-- 🤖 **AI-Powered Analysis** - Leverages Groq's Llama 3.3 70B model for intelligent resume evaluation
+- 🤖 **AI-Powered Analysis** - Leverages Groq's Llama 3.3 70B model for ultra-fast, intelligent resume evaluation
 - 📊 **ATS Optimization** - Get specific tips to improve your ATS compatibility score
-- 🎯 **Job-Specific Feedback** - Tailored analysis based on your target job description
-- 📈 **Detailed Scoring** - Comprehensive breakdown across 4 key categories:
-  - **Tone & Style** - Professional language and presentation
-  - **Content** - Relevance and impact of your experience
-  - **Structure** - Organization and readability
-  - **Skills** - Technical and soft skills alignment
-- 🎨 **Modern UI** - Beautiful, responsive design with glassmorphic effects
-- 📱 **Fully Responsive** - Seamless experience across desktop, tablet, and mobile
-- 🔒 **Secure** - Built-in authentication and row-level security
+- 🎯 **Job-Specific Feedback** - Tailored analysis based on your target job description and company
+- 📈 **Detailed Scoring** - Comprehensive breakdown across key categories (Tone & Style, Content, Structure, Skills)
+- ⚡ **High-Performance Architecture** - Backed by Redis caching, BullMQ background jobs, and robust rate limiting
+- 🎨 **Modern UI** - Beautiful, responsive design with glassmorphic effects and real-time polling updates
+- 🔒 **Secure** - Built-in JWT authentication and Row Level Security (RLS) via Supabase
 
 ---
 
 ## 🚀 Tech Stack
 
-### Frontend
-- **React 19** - Latest React with modern features
-- **React Router v7** - File-based routing with SSR capabilities
-- **TypeScript** - Type-safe development
+### Frontend (`/app`)
+- **React 19** & **React Router v7** - Modern SPA framework and routing
 - **Vite** - Lightning-fast build tool
 - **Tailwind CSS v4** - Utility-first styling
+- **Framer Motion** - Smooth UI animations
 - **Lucide React** - Beautiful, consistent icons
 
-### Backend & Services
-- **Supabase** - Backend-as-a-Service
-  - PostgreSQL database
-  - Authentication
-  - Storage
-  - Row Level Security (RLS)
-- **Groq AI** - Ultra-fast LLM inference
-  - Model: `llama-3.3-70b-versatile`
-  - JSON mode for structured responses
+### Backend (`/backend`)
+- **Node.js & Express** - Robust API server
+- **TypeScript** - Type-safe development across the stack
+- **BullMQ** - Reliable background job processing
+- **Upstash Redis** - Used for:
+  - Strict Sliding-Window Rate Limiting (10/hr, 25/day)
+  - SHA-256 Prompt Caching to save AI tokens on identical requests
+  - TCP connections for the background queue worker
+- **Groq AI** - Ultra-fast LLM inference (`llama-3.3-70b-versatile`)
+- **Zod** - Schema validation and structured LLM JSON parsing
 
-### Libraries
-- **PDF.js** - Client-side PDF rendering and text extraction
-- **Groq SDK** - Official Groq API client
+### Database
+- **Supabase (PostgreSQL)** - Stores users, usage logs, resumes, and analysis feedback
 
 ---
 
@@ -65,10 +61,11 @@
 
 Before you begin, ensure you have:
 
-- **Node.js** 18+ installed
+- **Node.js** 20+ installed
 - **npm** or **yarn** package manager
 - **Supabase** account ([sign up here](https://supabase.com))
 - **Groq API** key ([get one here](https://console.groq.com))
+- **Upstash Redis** database ([create one free here](https://upstash.com))
 
 ---
 
@@ -83,40 +80,52 @@ cd cvision
 
 ### 2. Install Dependencies
 
+Install dependencies for both the frontend and the backend.
+
 ```bash
+# Install frontend dependencies
 npm install
+
+# Install backend dependencies
+cd backend
+npm install
+cd ..
 ```
 
 ### 3. Environment Setup
 
-Create a `.env` file in the root directory:
+Copy `.env.example` to `.env` in both the root folder and the `/backend` folder.
 
+#### Root `.env` (Frontend)
 ```env
-# Supabase Configuration
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# Groq AI Configuration
-GROQ_API_KEY=your_groq_api_key
+VITE_API_URL=http://localhost:3000
 ```
 
-**How to get these values:**
+#### `/backend/.env` (Backend)
+```env
+PORT=3000
+ALLOWED_ORIGIN=http://localhost:5173
 
-#### Supabase
-1. Go to [Supabase Dashboard](https://app.supabase.com)
-2. Create a new project or select existing
-3. Go to **Settings** → **API**
-4. Copy `Project URL` and `anon public` key
+# Supabase Admin access
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
-#### Groq
-1. Visit [Groq Console](https://console.groq.com)
-2. Sign up or log in
-3. Navigate to **API Keys**
-4. Create a new API key
+# Groq AI
+GROQ_API_KEY=your_groq_api_key
+
+# Upstash Redis (Rate Limiting & Caching)
+UPSTASH_REDIS_REST_URL=your_upstash_rest_url
+UPSTASH_REDIS_REST_TOKEN=your_upstash_rest_token
+
+# Upstash Redis (BullMQ Job Queue)
+UPSTASH_REDIS_URL=rediss://default:password@your-upstash-url:port
+```
 
 ### 4. Database Setup
 
-Run these SQL commands in your Supabase SQL Editor:
+Run these SQL commands in your Supabase SQL Editor to set up the tables and policies:
 
 ```sql
 -- Create resumes table
@@ -129,184 +138,75 @@ CREATE TABLE resumes (
   resume_path TEXT,
   image_path TEXT,
   feedback JSONB,
+  status TEXT DEFAULT 'pending',
+  overall_score INTEGER,
+  analysis_version INTEGER DEFAULT 1,
+  error_message TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable Row Level Security
+-- Create usage_logs table
+CREATE TABLE usage_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id),
+  action TEXT NOT NULL,
+  company_name TEXT,
+  job_title TEXT,
+  tokens_used INTEGER DEFAULT 0,
+  latency_ms INTEGER,
+  success BOOLEAN,
+  error_message TEXT,
+  cache_hit BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS and create basic policies
 ALTER TABLE resumes ENABLE ROW LEVEL SECURITY;
 
--- Create policies
-CREATE POLICY "Users can view own resumes"
-  ON resumes FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own resumes"
-  ON resumes FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own resumes"
-  ON resumes FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own resumes"
-  ON resumes FOR DELETE
-  USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own resumes" ON resumes FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own resumes" ON resumes FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own resumes" ON resumes FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own resumes" ON resumes FOR DELETE USING (auth.uid() = user_id);
 ```
-
-### 5. Storage Setup
-
-In Supabase Dashboard:
-1. Go to **Storage**
-2. Create a new bucket named `resumes`
-3. Set it to **Public** (for PDF previews)
-4. Configure CORS if needed
 
 ---
 
 ## 🎯 Usage
 
-### Development
+To run the application locally, you need to start both the backend server and the frontend development server.
 
-Start the development server:
-
+### Start the Backend
 ```bash
+cd backend
 npm run dev
 ```
 
-The app will be available at `http://localhost:5174`
-
-### Build for Production
-
+### Start the Frontend
+In a new terminal window:
 ```bash
-npm run build
+npm run dev
 ```
-
-### Preview Production Build
-
-```bash
-npm run start
-```
+The app will be available at `http://localhost:5173`
 
 ---
 
-## 📖 How It Works
+## 🏗️ Architecture
 
-### 1. **Upload Your Resume**
-- Drag and drop or select a PDF file
-- Enter the job title and description you're targeting
-- Provide company name for context
+CVision utilizes a highly scalable, decoupled architecture designed for heavy AI workloads:
 
-### 2. **AI Analysis**
-CVision performs a comprehensive analysis:
-- Extracts text from your PDF
-- Analyzes content against job requirements
-- Evaluates ATS compatibility
-- Generates detailed feedback
-
-### 3. **Review Insights**
-Get actionable feedback across multiple dimensions:
-- **Overall Score** - Calculated from all categories
-- **ATS Score** - Specific optimization tips
-- **Category Breakdowns** - Detailed analysis of tone, content, structure, and skills
-- **Recommendations** - Prioritized action items
-
-### 4. **Optimize & Iterate**
-- Review strengths and weaknesses
-- Implement suggested improvements
-- Re-analyze to track progress
-
----
-
-## 🎨 Design Philosophy
-
-CVision follows a **"Modern Professional"** design approach inspired by products like Linear, Raycast, and Vercel:
-
-- **Deep Dark Mode** - Slate-950 background for reduced eye strain
-- **Glassmorphism** - Frosted glass effects for depth and elegance
-- **Gradient Accents** - Violet-to-fuchsia gradients for visual interest
-- **Smooth Animations** - CSS-based transitions for performance
-- **Responsive Design** - Mobile-first approach
-
----
-
-## 📁 Project Structure
-
-```
-cvision/
-├── app/
-│   ├── components/          # Reusable UI components
-│   │   ├── Accordion.tsx
-│   │   ├── ATS.tsx
-│   │   ├── Button.tsx
-│   │   ├── Card.tsx
-│   │   ├── Details.tsx
-│   │   ├── FileUploader.tsx
-│   │   ├── Navbar.tsx
-│   │   ├── ScoreBadge.tsx
-│   │   ├── ScoreCircle.tsx
-│   │   ├── ScoreGauge.tsx
-│   │   └── Summary.tsx
-│   ├── lib/                 # Utilities
-│   │   ├── pdf2img.ts       # PDF processing
-│   │   ├── supabase.ts      # Supabase client
-│   │   └── utils.ts         # Helper functions
-│   ├── routes/              # Pages
-│   │   ├── auth.tsx         # Authentication
-│   │   ├── home.tsx         # Dashboard
-│   │   ├── resume.tsx       # Resume detail view
-│   │   ├── upload.tsx       # Upload & analyze
-│   │   └── api.analyze.ts   # AI analysis API
-│   ├── services/
-│   │   └── ai.server.ts     # Groq AI integration
-│   ├── app.css              # Global styles
-│   └── routes.ts            # Route configuration
-├── scripts/                 # Utility scripts
-├── .env                     # Environment variables
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
-```
+1. **Authentication:** The frontend authenticates directly with Supabase. The session JWT is sent to the Express backend.
+2. **Rate Limiting:** The backend checks the JWT against an Upstash Redis sliding window.
+3. **Queueing:** If rate limits allow, the backend immediately enqueues an `AnalysisJob` into BullMQ and returns a `jobId` to the frontend.
+4. **Processing & Caching:** The BullMQ Worker picks up the job. It first generates a SHA-256 hash of the inputs. If a cached analysis exists in Redis, it skips Groq entirely. If not, it requests a structured JSON analysis from Llama 3.3 70B, caches the result, and writes it back to Supabase securely via the Service Role key.
+5. **Polling:** The frontend polls the `/job/:jobId` endpoint every 2 seconds, updating a progress bar until completion, then redirects to the final `/resume/:id` dashboard.
 
 ---
 
 ## 🔐 Security
 
-CVision implements multiple security layers:
-
-- **Row Level Security (RLS)** - Database-level access control
-- **Server-Side API Keys** - Groq API key never exposed to client
-- **Authentication Tokens** - JWT-based session management
-- **Input Validation** - All user inputs are validated
-- **HTTPS Only** - Enforced in production
-
----
-
-## 🚀 Deployment
-
-### Recommended Platforms
-
-#### Frontend (Vercel)
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
-```
-
-#### Backend (Supabase)
-Already hosted! Just ensure your environment variables are set correctly.
-
-### Environment Variables for Production
-
-Make sure to set these in your deployment platform:
-
-```env
-VITE_SUPABASE_URL=your_production_supabase_url
-VITE_SUPABASE_ANON_KEY=your_production_anon_key
-GROQ_API_KEY=your_groq_api_key
-```
+- **Row Level Security (RLS)** ensures users can only read/write their own data on the frontend.
+- **Server-Side AI & DB Admin:** The `GROQ_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are kept strictly in the Node.js backend.
+- **DDoS Protection:** IP & User-based rate limiting on all analysis routes.
 
 ---
 
@@ -322,15 +222,8 @@ Contributions are welcome! Please follow these steps:
 
 ---
 
-## 🙏 Acknowledgments
-
-- **Groq** - For providing ultra-fast AI inference
-- **Supabase** - For the amazing backend platform
-- **React Router** - For the excellent routing solution
-- **Tailwind CSS** - For the utility-first CSS framework
-
 <div align="center">
 
-**Built with ❤️ by the Sanatan Singh Vishen**
+**Built with ❤️ by Sanatan Singh Vishen**
 
 </div>
