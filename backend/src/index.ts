@@ -70,7 +70,7 @@ app.post('/analyze', apiLimiter, async (req, res) => {
         if (supabaseAdmin) {
             const { error: dbError } = await supabaseAdmin
                 .from('resumes')
-                .update({ feedback })
+                .update({ feedback, company_name: companyName })
                 .eq('id', resumeId);
                 
             if (dbError) {
@@ -84,6 +84,51 @@ app.post('/analyze', apiLimiter, async (req, res) => {
         res.json({ feedback });
     } catch (error: any) {
         console.error('Analysis error:', error);
+        res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+});
+
+app.get('/analyses/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        if (!supabaseAdmin) {
+            return res.status(500).json({ error: "Database connection not configured" });
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('resumes')
+            .select('id, company_name, job_title, created_at, feedback')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error("Supabase query error:", error);
+            return res.status(500).json({ error: 'Database query failed' });
+        }
+
+        // Only send scores if feedback exists to keep it lightweight
+        const lightweightData = data.map(item => {
+            const fb = item.feedback;
+            let lightweightFeedback: any = null;
+            if (fb) {
+                lightweightFeedback = {
+                    ATS: fb.ATS ? { score: fb.ATS.score } : undefined,
+                    content: fb.content ? { score: fb.content.score } : undefined,
+                    toneAndStyle: fb.toneAndStyle ? { score: fb.toneAndStyle.score } : undefined,
+                    structure: fb.structure ? { score: fb.structure.score } : undefined,
+                };
+            }
+            
+            return {
+                ...item,
+                feedback: lightweightFeedback
+            };
+        });
+
+        res.json(lightweightData);
+    } catch (error: any) {
+        console.error('Fetch analyses error:', error);
         res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 });

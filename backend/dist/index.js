@@ -28,19 +28,24 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
     ? (0, supabase_js_1.createClient)(supabaseUrl, supabaseServiceKey)
     : null;
-app.use((0, cors_1.default)()); // Configure this more strictly for production if needed
+app.use((0, cors_1.default)({
+    origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type'],
+}));
 app.use(express_1.default.json({ limit: '10mb' }));
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 // Rate limiting setup
 const apiLimiter = (0, express_rate_limit_1.default)({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // Limit each IP to 10 requests per window
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per window
     message: { error: 'Too many requests, please try again later.' }
 });
 // Zod schema for payload validation
 const analyzeSchema = zod_1.z.object({
+    companyName: zod_1.z.string().max(200, "Company name is too long (max 200 chars)"),
     jobTitle: zod_1.z.string().max(200, "Job title is too long (max 200 chars)"),
     jobDescription: zod_1.z.string().max(10000, "Job description is too long (max 10000 chars)"),
     resumeText: zod_1.z.string().max(20000, "Resume text is too long (max 20000 chars)"),
@@ -56,8 +61,9 @@ app.post('/analyze', apiLimiter, (req, res) => __awaiter(void 0, void 0, void 0,
                 details: parsedBody.error.issues
             });
         }
-        const { jobTitle, jobDescription, resumeText, resumeId } = parsedBody.data;
+        const { companyName, jobTitle, jobDescription, resumeText, resumeId } = parsedBody.data;
         const feedback = yield (0, ai_1.analyzeResume)({
+            companyName,
             jobTitle,
             jobDescription,
             resumeText,
@@ -66,7 +72,7 @@ app.post('/analyze', apiLimiter, (req, res) => __awaiter(void 0, void 0, void 0,
         if (supabaseAdmin) {
             const { error: dbError } = yield supabaseAdmin
                 .from('resumes')
-                .update({ feedback })
+                .update({ feedback, company_name: companyName })
                 .eq('id', resumeId);
             if (dbError) {
                 console.error("Supabase Admin Update Error:", dbError);
@@ -80,6 +86,42 @@ app.post('/analyze', apiLimiter, (req, res) => __awaiter(void 0, void 0, void 0,
     }
     catch (error) {
         console.error('Analysis error:', error);
+        res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+}));
+app.get('/analyses/:userId', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { userId } = req.params;
+        if (!supabaseAdmin) {
+            return res.status(500).json({ error: "Database connection not configured" });
+        }
+        const { data, error } = yield supabaseAdmin
+            .from('resumes')
+            .select('id, company_name, job_title, created_at, feedback')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.error("Supabase query error:", error);
+            return res.status(500).json({ error: 'Database query failed' });
+        }
+        // Only send scores if feedback exists to keep it lightweight
+        const lightweightData = data.map(item => {
+            const fb = item.feedback;
+            let lightweightFeedback = null;
+            if (fb) {
+                lightweightFeedback = {
+                    ATS: fb.ATS ? { score: fb.ATS.score } : undefined,
+                    content: fb.content ? { score: fb.content.score } : undefined,
+                    toneAndStyle: fb.toneAndStyle ? { score: fb.toneAndStyle.score } : undefined,
+                    structure: fb.structure ? { score: fb.structure.score } : undefined,
+                };
+            }
+            return Object.assign(Object.assign({}, item), { feedback: lightweightFeedback });
+        });
+        res.json(lightweightData);
+    }
+    catch (error) {
+        console.error('Fetch analyses error:', error);
         res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 }));

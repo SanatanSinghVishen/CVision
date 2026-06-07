@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router";
 import { supabase } from "~/lib/supabase";
-import { LogOut, User, Home, Upload, Sparkles, LogIn } from "lucide-react";
+import { LogOut, User, Home, Upload, Sparkles, LogIn, History as HistoryIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const Navbar = () => {
@@ -56,6 +56,13 @@ const Navbar = () => {
                             >
                                 <Home className="w-4 h-4" />
                                 <span className="hidden sm:inline">Dashboard</span>
+                            </Link>
+                            <Link
+                                to="/history"
+                                className="px-4 py-2 rounded-full text-sm font-medium text-[#A1A1AA] hover:text-[#F8F9FC] hover:bg-[#1E1E24] transition-all duration-200 flex items-center gap-2"
+                            >
+                                <HistoryIcon className="w-4 h-4" />
+                                <span className="hidden sm:inline">History</span>
                             </Link>
                             <Link
                                 to="/upload"
