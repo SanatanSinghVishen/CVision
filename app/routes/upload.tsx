@@ -4,7 +4,7 @@ import Navbar from "~/components/Navbar";
 import { type MetaFunction, useNavigate } from "react-router";
 import { convertPdfToImage, extractTextFromPdf } from "~/lib/pdf2img";
 import { supabase } from "~/lib/supabase";
-import { Upload, FileText, Sparkles, CheckCircle2, Loader2, X, Building, Briefcase, FileSearch } from "lucide-react";
+import { Upload, FileText, Sparkles, CheckCircle2, Loader2, X, Building, Briefcase, FileSearch, AlertCircle } from "lucide-react";
 import { Card } from "~/components/ui/Card";
 import toast from 'react-hot-toast';
 
@@ -15,12 +15,36 @@ export const meta: MetaFunction = () => {
     ];
 };
 
-const LOADING_MESSAGES = [
-    "Reading your resume...",
-    "Querying AI...",
-    "Building your report...",
-    "Finalizing insights..."
-];
+type AnalyzePayload = {
+    companyName: string;
+    jobTitle: string;
+    jobDescription: string;
+    resumeText: string;
+    resumeId: string;
+};
+
+const STAGES = {
+  uploading: {
+    label: 'Uploading your resume...',
+    sublabel: 'Securely sending to our servers',
+    progress: 15,
+  },
+  reading: {
+    label: 'Reading your resume...',
+    sublabel: 'Extracting experience, skills, and projects',
+    progress: 35,
+  },
+  analyzing: {
+    label: 'Analyzing for target role...',
+    sublabel: 'Matching against the job description',
+    progress: 65,
+  },
+  building: {
+    label: 'Building your report...',
+    sublabel: 'Generating suggestions and rewrites',
+    progress: 85,
+  },
+};
 
 const UploadPage = () => {
     const navigate = useNavigate();
@@ -34,22 +58,25 @@ const UploadPage = () => {
     // UI State
     const [isDragging, setIsDragging] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
     const [shakeFields, setShakeFields] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    
+    // Stream State
+    const [streamBuffer, setStreamBuffer] = useState('');
+    const [loadingStage, setLoadingStage] = useState<'uploading' | 'reading' | 'analyzing' | 'building'>('uploading');
+
+    // Dynamic STAGES initialization for company name
+    const stages = {
+        ...STAGES,
+        analyzing: {
+            ...STAGES.analyzing,
+            label: `Analyzing for ${companyName || 'target role'}...`
+        }
+    };
 
     // Progressive indicator
     const filledFields = [companyName, jobTitle, file, jobDescription].filter(Boolean).length;
     const isFormValid = companyName && jobTitle && file && jobDescription;
-
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (isProcessing) {
-            interval = setInterval(() => {
-                setLoadingMsgIdx((prev) => (prev + 1) % LOADING_MESSAGES.length);
-            }, 3000);
-        }
-        return () => clearInterval(interval);
-    }, [isProcessing]);
 
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
@@ -68,8 +95,74 @@ const UploadPage = () => {
         setTimeout(() => setShakeFields(false), 500);
     };
 
+    const analyzeWithStream = async (payload: AnalyzePayload, token: string) => {
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const response = await fetch(`${apiUrl}/analyze/stream`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok || !response.body) {
+            const err = await response.json().catch(() => ({}));
+            if (response.status === 429) {
+                throw new Error('Analysis limit reached. Try again in an hour.');
+            } else if (response.status === 401) {
+                throw new Error('Session expired. Please log in again.');
+            } else {
+                throw new Error(err.error ?? 'Something went wrong. Please try again.');
+            }
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        let totalTokensEstimate = 0; // rough tracking
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const lines = decoder.decode(value, { stream: true }).split('\n\n');
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+
+                let data;
+                try {
+                    data = JSON.parse(line.replace('data: ', '').trim());
+                } catch {
+                    continue; // Skip malformed JSON chunks
+                }
+
+                if (data.delta) {
+                    setStreamBuffer(prev => prev + data.delta);
+                    totalTokensEstimate++;
+                    
+                    // Stage transitions based on rough token count
+                    if (totalTokensEstimate === 1) setLoadingStage('reading');
+                    else if (totalTokensEstimate === 50) setLoadingStage('analyzing');
+                    else if (totalTokensEstimate === 300) setLoadingStage('building');
+                }
+
+                if (data.done && data.resumeId) {
+                    navigate(`/resume/${data.resumeId}`);
+                    return;
+                }
+
+                if (data.error) {
+                    throw new Error(data.error); // Re-thrown and caught by outer upload handler
+                }
+            }
+        }
+    };
+
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+        setUploadError(null);
 
         if (!isFormValid) {
             triggerShake();
@@ -78,6 +171,8 @@ const UploadPage = () => {
         }
 
         setIsProcessing(true);
+        setLoadingStage('uploading');
+        setStreamBuffer('');
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -85,87 +180,111 @@ const UploadPage = () => {
                 throw new Error("You must be signed in to analyze a resume. Please log in first.");
             }
 
-            // 2. Convert PDF & Extract Text
             const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
             if (file.size > MAX_FILE_SIZE) {
                 throw new Error("File exceeds 5MB limit. Please compress your PDF.");
             }
+            
             const imageResult = await convertPdfToImage(file);
             if (!imageResult.file) {
-                const errorMsg = imageResult.error || "PDF Conversion Failed";
-                throw new Error(errorMsg);
+                throw new Error(imageResult.error || "PDF Conversion Failed");
             }
             const resumeText = await extractTextFromPdf(file);
 
-            // 3. Upload to Supabase Storage (Conditionally for Authenticated Users)
             let targetResumeId = crypto.randomUUID();
+            const timestamp = Date.now();
+            const resumePath = `${session.user.id}/${timestamp}_${file.name}`;
+            const imagePath = `${session.user.id}/${timestamp}_${imageResult.file.name}`;
 
-            if (session) {
-                const timestamp = Date.now();
-                const resumePath = `${session.user.id}/${timestamp}_${file.name}`;
-                const imagePath = `${session.user.id}/${timestamp}_${imageResult.file.name}`;
+            const { error: resumeError } = await supabase.storage.from('resumes').upload(resumePath, file);
+            if (resumeError) throw new Error(`Resume Upload Failed: ${resumeError.message}`);
 
-                const { error: resumeError } = await supabase.storage.from('resumes').upload(resumePath, file);
-                if (resumeError) throw new Error(`Resume Upload Failed: ${resumeError.message}`);
+            const { error: imageError } = await supabase.storage.from('resumes').upload(imagePath, imageResult.file);
+            if (imageError) throw new Error(`Image Upload Failed: ${imageError.message}`);
 
-                const { error: imageError } = await supabase.storage.from('resumes').upload(imagePath, imageResult.file);
-                if (imageError) throw new Error(`Image Upload Failed: ${imageError.message}`);
+            const { data: dbData, error: dbError } = await supabase
+                .from('resumes')
+                .insert({
+                    user_id: session.user.id,
+                    company_name: companyName,
+                    job_title: jobTitle,
+                    job_description: jobDescription,
+                    resume_path: resumePath,
+                    image_path: imagePath,
+                    feedback: null,
+                    status: 'pending',
+                    overall_score: null,
+                })
+                .select()
+                .single();
 
-                // 4. Initial DB Insert
-                const { data: dbData, error: dbError } = await supabase
-                    .from('resumes')
-                    .insert({
-                        user_id: session.user.id,
-                        company_name: companyName,
-                        job_title: jobTitle,
-                        job_description: jobDescription,
-                        resume_path: resumePath,
-                        image_path: imagePath,
-                        feedback: null,
-                        status: 'pending',
-                        overall_score: null,
-                    })
-                    .select()
-                    .single();
+            if (dbError) throw new Error(`DB Save Failed: ${dbError.message}`);
+            targetResumeId = dbData.id;
 
-                if (dbError) throw new Error(`DB Save Failed: ${dbError.message}`);
-                targetResumeId = dbData.id;
-            }
-
-            // 5. Call AI API
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-            const response = await fetch(`${apiUrl}/analyze`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`
-                },
-                body: JSON.stringify({
+            try {
+                await analyzeWithStream({
                     companyName,
                     jobTitle,
                     jobDescription,
                     resumeText,
                     resumeId: targetResumeId
-                })
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`AI Analysis Failed: ${response.status} ${errorText}`);
+                }, session.access_token);
+            } catch (streamErr: any) {
+                throw new Error(streamErr.message || "Connection lost during analysis. Your resume was not saved — please try again.");
             }
-
-            const { feedback, error: apiError } = await response.json();
-            if (apiError) throw new Error(apiError);
-
-            // 6. Navigate to Results
-            navigate(`/resume/${targetResumeId}`, { state: { feedback, guestMode: !session } });
 
         } catch (error: any) {
             console.error("Upload Logic Error:", error);
-            toast.error(error.message || "An error occurred during analysis.");
+            setUploadError(error.message || "An error occurred during analysis.");
             setIsProcessing(false);
         }
     };
+
+    if (isProcessing) {
+        return (
+            <main className="min-h-screen bg-[#0A0A0F] text-[#F8F9FC] font-sans pb-24">
+                <Navbar />
+                <div className="flex flex-col items-center justify-center min-h-[80vh] gap-8 px-4 pt-20">
+                    <div className="text-center animate-fade-in-up">
+                        <p className="text-[#A1A1AA] text-sm mb-2 uppercase tracking-widest font-medium">Analyzing for</p>
+                        <p className="text-2xl font-bold text-[#F8F9FC]">{jobTitle} at <span className="text-[#10B981]">{companyName}</span></p>
+                    </div>
+
+                    <div className="w-full max-w-md animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+                        <div className="h-1.5 bg-[#13131A] rounded-full overflow-hidden border border-[#27272A]">
+                            <motion.div
+                                className="h-full bg-[#6366F1] shadow-[0_0_10px_rgba(99,102,241,0.5)]"
+                                animate={{ width: `${stages[loadingStage].progress}%` }}
+                                transition={{ duration: 0.8, ease: 'easeOut' }}
+                            />
+                        </div>
+                    </div>
+
+                    <motion.div
+                        key={loadingStage}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-center"
+                    >
+                        <p className="text-xl font-medium text-[#F8F9FC]">{stages[loadingStage].label}</p>
+                        <p className="text-[#A1A1AA] mt-2">{stages[loadingStage].sublabel}</p>
+                    </motion.div>
+
+                    {streamBuffer && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="w-full max-w-md bg-[#13131A] border border-[#27272A] rounded-xl p-5 font-mono text-xs text-[#A1A1AA] overflow-hidden max-h-32 relative shadow-inner break-words whitespace-pre-wrap text-left"
+                        >
+                            <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#13131A] to-transparent pointer-events-none" />
+                            {streamBuffer.slice(-400)}
+                            <span className="animate-pulse text-[#6366F1] ml-1">▌</span>
+                        </motion.div>
+                    )}
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main className="min-h-screen bg-[#0A0A0F] text-[#F8F9FC] font-sans pb-24">
@@ -339,6 +458,20 @@ const UploadPage = () => {
                             </div>
                         </motion.div>
 
+                        {/* Error Banner */}
+                        {uploadError && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="p-4 bg-[#EF4444]/10 border border-[#EF4444]/20 rounded-xl flex gap-3 items-start"
+                            >
+                                <AlertCircle className="w-5 h-5 text-[#EF4444] shrink-0 mt-0.5" />
+                                <div className="text-[#F8F9FC] text-sm leading-relaxed">
+                                    {uploadError}
+                                </div>
+                            </motion.div>
+                        )}
+
                         {/* Submit Button */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
@@ -347,37 +480,16 @@ const UploadPage = () => {
                         >
                             <button
                                 type="submit"
-                                disabled={(!isFormValid && !isProcessing) || isProcessing}
-                                className={`relative w-full h-14 rounded-xl font-medium text-lg transition-all overflow-hidden ${isProcessing ? 'bg-[#1E1E24] cursor-not-allowed' :
+                                disabled={!isFormValid}
+                                className={`relative w-full h-14 rounded-xl font-medium text-lg transition-all overflow-hidden ${
                                         isFormValid ? 'bg-[#6366F1] hover:bg-[#4F46E5] text-white shadow-[0_0_20px_rgba(99,102,241,0.3)]' :
                                             'bg-[#1E1E24] text-[#6B7280] cursor-not-allowed border border-[#27272A]'
                                     }`}
                             >
-                                <AnimatePresence mode="wait">
-                                    {isProcessing ? (
-                                        <motion.div
-                                            key="processing"
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -10 }}
-                                            className="absolute inset-0 flex items-center justify-center gap-3 text-[#6366F1]"
-                                        >
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                            <span>{LOADING_MESSAGES[loadingMsgIdx]}</span>
-                                        </motion.div>
-                                    ) : (
-                                        <motion.div
-                                            key="idle"
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: -10 }}
-                                            className="absolute inset-0 flex items-center justify-center gap-2"
-                                        >
-                                            <Sparkles className="w-5 h-5" />
-                                            Analyze {companyName ? `for ${companyName}` : 'Resume'}
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                <div className="absolute inset-0 flex items-center justify-center gap-2">
+                                    <Sparkles className="w-5 h-5" />
+                                    Analyze {companyName ? `for ${companyName}` : 'Resume'}
+                                </div>
                             </button>
                         </motion.div>
 
