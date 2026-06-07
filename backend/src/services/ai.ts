@@ -115,6 +115,8 @@ Resume Content:
 ${safeResumeText}
 
 Return ONLY a valid JSON object. No markdown. No explanation. No text outside the JSON.
+IMPORTANT: The numerical scores (85, 75, 80, etc) in the schema below are ONLY EXAMPLES. You MUST genuinely evaluate the resume and output REAL calculated scores from 0-100 based on the candidate's actual fit. DO NOT simply copy the example numbers.
+
 The JSON must follow this exact schema:
 
 {
