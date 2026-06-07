@@ -21,7 +21,7 @@ export interface AnalysisJobResult {
 
 // ── Queue definition ──────────────────────────────────────────────────────────
 export const analysisQueue = new Queue<AnalysisJobData, AnalysisJobResult, string>(
-  'cvision:analysis',
+  'cvision-analysis',
   {
     connection: bullRedisConnection as any,
     defaultJobOptions: {
@@ -43,7 +43,7 @@ export const analysisQueue = new Queue<AnalysisJobData, AnalysisJobResult, strin
 
 // ── Queue events — for job status polling ────────────────────────────────────
 export const analysisQueueEvents = new QueueEvents(
-  'cvision:analysis',
+  'cvision-analysis',
   { connection: bullRedisConnection as any }
 )
 

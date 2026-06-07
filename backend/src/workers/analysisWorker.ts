@@ -8,7 +8,7 @@ import {
 } from '../lib/queue'
 
 const worker = new Worker<AnalysisJobData, AnalysisJobResult, string>(
-  'cvision:analysis',
+  'cvision-analysis',
   async (job: Job<AnalysisJobData>) => {
 
     const {
