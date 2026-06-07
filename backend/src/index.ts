@@ -6,7 +6,9 @@ import { supabaseAdmin } from './lib/supabase';
 import { authMiddleware } from './middleware/auth';
 import { analyzeResume, streamAnalyzeResume, parseWithRetry } from './services/ai';
 import analysesRouter from './routes/analyses';
-import { enqueueAnalysis, getJobStatus } from './lib/queue';
+import { enqueueAnalysis, getJobStatus, analysisQueue } from './lib/queue';
+import { checkRedisHealth } from './lib/redis';
+import { getCacheStats } from './lib/cache';
 import './workers/analysisWorker';
 
 dotenv.config();
@@ -24,32 +26,47 @@ app.use(express.json({ limit: '10mb' }));
 
 import Groq from "groq-sdk";
 
-app.get('/health', async (req, res) => {
-    try {
-        const apiKey = process.env.GROQ_API_KEY;
-        const groq = new Groq({ apiKey });
-        const groqOk = await groq.models.list().then(() => true).catch(() => false);
-        
-        let dbError = null;
-        if (supabaseAdmin) {
-            const { error } = await supabaseAdmin.from('resumes').select('id').limit(1);
-            dbError = error;
-        } else {
-            dbError = { message: 'Supabase Admin not initialized' };
-        }
+app.get('/health', async (req, res): Promise<any> => {
+  const apiKey = process.env.GROQ_API_KEY;
+  const groq = new Groq({ apiKey });
 
-        res.json({
-            status: 'ok',
-            timestamp: new Date().toISOString(),
-            uptime: Math.floor(process.uptime()),
-            services: {
-                groq: groqOk ? 'connected' : 'error',
-                supabase: dbError ? 'error' : 'connected',
-            }
-        });
-    } catch (e) {
-        res.status(500).json({ status: 'error', details: e });
-    }
+  const [groqOk, redisOk, cacheStats] = await Promise.all([
+    groq.models.list().then(() => true).catch(() => false),
+    checkRedisHealth(),
+    getCacheStats(),
+  ])
+
+  let dbError = null;
+  if (supabaseAdmin) {
+      const { error } = await supabaseAdmin.from('resumes').select('id').limit(1);
+      dbError = error;
+  } else {
+      dbError = { message: 'Supabase Admin not initialized' };
+  }
+
+  const queueCounts = await analysisQueue.getJobCounts(
+    'waiting', 'active', 'completed', 'failed'
+  )
+
+  const allHealthy = groqOk && redisOk && !dbError
+
+  return res.status(allHealthy ? 200 : 503).json({
+    status: allHealthy ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    services: {
+      groq: groqOk ? 'connected' : 'error',
+      supabase: dbError ? 'error' : 'connected',
+      redis: redisOk ? 'connected' : 'error',
+    },
+    queue: {
+      waiting: queueCounts.waiting,
+      active: queueCounts.active,
+      completed: queueCounts.completed,
+      failed: queueCounts.failed,
+    },
+    cache: cacheStats,
+  })
 });
 
 import { AuthRequest } from './middleware/auth';
