@@ -1,0 +1,1 @@
+ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS cache_hit BOOLEAN DEFAULT false;

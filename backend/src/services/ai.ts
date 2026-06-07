@@ -1,6 +1,12 @@
 import Groq from "groq-sdk";
 import sanitizeHtml from "sanitize-html";
 import { FeedbackSchema, Feedback } from "../schemas/feedback";
+import { supabaseAdmin } from "../lib/supabase";
+import {
+  getAnalysisCacheKey,
+  getCachedAnalysis,
+  setCachedAnalysis
+} from '../lib/cache';
 
 export const parseWithRetry = async (
   rawResponse: string,
@@ -38,50 +44,113 @@ export async function analyzeResume(
     jobTitle: string,
     jobDescription: string,
     companyName: string,
-    resumeId: string
-) {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-        throw new Error("Missing GROQ_API_KEY environment variable.");
+    resumeId: string,
+    userId: string,
+    forceRefresh = false
+): Promise<Feedback> {
+    const startTime = Date.now()
+
+    // ── Cache check ────────────────────────────────────────────────────────────
+    const cacheKey = getAnalysisCacheKey(
+      companyName, jobTitle, jobDescription, resumeText
+    )
+
+    if (!forceRefresh) {
+      const cached = await getCachedAnalysis(cacheKey)
+      if (cached) {
+        if (supabaseAdmin) {
+            await supabaseAdmin
+              .from('resumes')
+              .update({
+                feedback: cached,
+                overall_score: cached.overallScore,
+                status: 'completed',
+                analysis_version: 1,
+              })
+              .eq('id', resumeId)
+
+            await supabaseAdmin.from('usage_logs').insert({
+              user_id: userId,
+              action: 'analyze',
+              company_name: companyName,
+              job_title: jobTitle,
+              tokens_used: 0,
+              latency_ms: Date.now() - startTime,
+              success: true,
+              cache_hit: true,
+            })
+        }
+        return cached
+      }
     }
 
-    const groq = new Groq({ apiKey });
-    const prompt = buildPrompt(companyName, jobTitle, jobDescription, resumeText);
+    // ── Cache miss — call Groq ─────────────────────────────────────────────────
+    const callGroqWithRetry = async () => {
+        const apiKey = process.env.GROQ_API_KEY;
+        if (!apiKey) throw new Error("Missing GROQ_API_KEY environment variable.");
+        
+        const groq = new Groq({ apiKey });
+        const prompt = buildPrompt(companyName, jobTitle, jobDescription, resumeText);
 
-    const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), ms)
-      );
-      return Promise.race([promise, timeout]);
+        const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), ms)
+          );
+          return Promise.race([promise, timeout]);
+        };
+
+        const fetchAI = async () => {
+            const response = await withTimeout(
+                groq.chat.completions.create({
+                    model: "llama-3.3-70b-versatile",
+                    messages: [{ role: "user", content: prompt }],
+                    response_format: { type: "json_object" },
+                }),
+                30_000
+            );
+            const content = response.choices[0].message.content;
+            const tokensUsed = response.usage?.total_tokens || 0;
+            if (!content) throw new Error("No response content from AI");
+            return { content, tokensUsed };
+        };
+
+        const initialResult = await fetchAI();
+        const feedback = await parseWithRetry(initialResult.content, async () => {
+            const res = await fetchAI();
+            return res.content;
+        });
+
+        return { feedback, tokensUsed: initialResult.tokensUsed };
     };
 
-    const fetchAI = async () => {
-        const response = await withTimeout(
-            groq.chat.completions.create({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                    {
-                        role: "user",
-                        content: prompt,
-                    },
-                ],
-                response_format: { type: "json_object" },
-            }),
-            30_000 // 30 second timeout
-        );
-        const content = response.choices[0].message.content;
-        const tokensUsed = response.usage?.total_tokens || 0;
-        if (!content) throw new Error("No response content from AI");
-        return { content, tokensUsed };
-    };
+    const { feedback, tokensUsed } = await callGroqWithRetry();
 
-    const initialResult = await fetchAI();
-    const feedback = await parseWithRetry(initialResult.content, async () => {
-        const res = await fetchAI();
-        return res.content;
-    });
+    // Save to cache for future identical requests
+    await setCachedAnalysis(cacheKey, feedback)
 
-    return { feedback, tokensUsed: initialResult.tokensUsed };
+    if (supabaseAdmin) {
+        await supabaseAdmin
+          .from('resumes')
+          .update({
+            feedback,
+            overall_score: feedback.overallScore,
+            status: 'completed',
+          })
+          .eq('id', resumeId)
+
+        await supabaseAdmin.from('usage_logs').insert({
+          user_id: userId,
+          action: 'analyze',
+          company_name: companyName,
+          job_title: jobTitle,
+          tokens_used: tokensUsed,
+          latency_ms: Date.now() - startTime,
+          success: true,
+          cache_hit: false,
+        })
+    }
+
+    return feedback
 }
 
 export function buildPrompt(
@@ -210,4 +279,3 @@ export async function* streamAnalyzeResume(
         yield chunk.choices[0]?.delta?.content || "";
     }
 }
-
