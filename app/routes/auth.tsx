@@ -249,13 +249,6 @@ const Auth = () => {
                     </div>
                 </Card>
 
-                {/* Guest nudge */}
-                <p className="text-center text-sm text-[#6B7280] font-medium mt-6">
-                    Just browsing?{' '}
-                    <Link to="/upload" className="font-bold text-[#6366F1] hover:text-[#4F46E5] transition-colors">
-                        Analyze a resume without signing in →
-                    </Link>
-                </p>
             </div>
         </main>
     );

@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import Navbar from "~/components/Navbar";
+import { supabase } from "~/lib/supabase";
 import { ArrowRight, CheckCircle2, Target, FileText, Briefcase, Zap, LineChart } from "lucide-react";
 import { Card } from "~/components/ui/Card";
 
@@ -16,12 +17,25 @@ const WORDS = ["Smarter Resume.", "Better Chances.", "Real Feedback."];
 
 export default function Landing() {
   const [wordIndex, setWordIndex] = useState(0);
+  const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
     const interval = setInterval(() => {
       setWordIndex((prev) => (prev + 1) % WORDS.length);
     }, 2500);
-    return () => clearInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
@@ -78,7 +92,7 @@ export default function Landing() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="flex justify-center"
           >
-            <Link to="/upload">
+            <Link to={session ? "/upload" : "/auth"}>
               <motion.button 
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.97 }}
