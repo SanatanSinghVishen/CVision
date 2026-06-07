@@ -81,6 +81,9 @@ const UploadPage = () => {
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                throw new Error("You must be signed in to analyze a resume. Please log in first.");
+            }
 
             // 2. Convert PDF & Extract Text
             const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -133,7 +136,10 @@ const UploadPage = () => {
             const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
             const response = await fetch(`${apiUrl}/analyze`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
                 body: JSON.stringify({
                     companyName,
                     jobTitle,
@@ -204,18 +210,7 @@ const UploadPage = () => {
                                 <label className="block text-sm font-medium text-[#A1A1AA]">Target Company</label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        {companyName ? (
-                                            <img
-                                                src={`https://logo.clearbit.com/${companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`}
-                                                onError={(e) => {
-                                                    (e.target as HTMLImageElement).style.display = 'none';
-                                                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                                                }}
-                                                className="h-5 w-5 rounded-sm object-contain"
-                                                alt=""
-                                            />
-                                        ) : null}
-                                        <Building className={`h-5 w-5 text-[#6B7280] ${companyName ? 'hidden' : ''}`} />
+                                        <Building className="h-5 w-5 text-[#6B7280]" />
                                     </div>
                                     <motion.input
                                         animate={shakeFields && !companyName ? { x: [-10, 10, -10, 10, 0] } : {}}
