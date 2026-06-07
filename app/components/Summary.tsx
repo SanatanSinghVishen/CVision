@@ -1,5 +1,6 @@
 import ScoreGauge from "~/components/ScoreGauge";
 import ScoreBadge from "~/components/ScoreBadge";
+import type { Feedback } from "~/types/feedback";
 
 const Category = ({ title, score }: { title: string, score: number }) => {
     const getColorClass = (s: number) => {
@@ -22,24 +23,8 @@ const Category = ({ title, score }: { title: string, score: number }) => {
     )
 }
 
-const Summary = ({ feedback }: { feedback: any }) => {
-    const calculateOverallScore = () => {
-        if (!feedback) return 0;
-
-        const scores = [
-            feedback.toneAndStyle?.score || 0,
-            feedback.content?.score || 0,
-            feedback.structure?.score || 0,
-            feedback.skills?.score || 0
-        ];
-
-        const validScores = scores.filter((s: number) => s > 0);
-        if (validScores.length === 0) return feedback.ATS?.score || 0;
-
-        return Math.round(validScores.reduce((a: number, b: number) => a + b, 0) / validScores.length);
-    };
-
-    const overallScore = calculateOverallScore();
+const Summary = ({ feedback }: { feedback: Feedback }) => {
+    const overallScore = feedback.overallScore || 0;
 
     return (
         <div className="bg-[#13131A] border border-[#27272A] rounded-3xl p-8 flex flex-col gap-6">
@@ -60,7 +45,6 @@ const Summary = ({ feedback }: { feedback: any }) => {
                 <Category title="Tone & Style" score={feedback?.toneAndStyle?.score || 0} />
                 <Category title="Content" score={feedback?.content?.score || 0} />
                 <Category title="Structure" score={feedback?.structure?.score || 0} />
-                <Category title="Skills" score={feedback?.skills?.score || 0} />
             </div>
         </div>
     )

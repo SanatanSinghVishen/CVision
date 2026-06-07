@@ -12,6 +12,7 @@ import { Card } from "~/components/ui/Card";
 import { Badge } from "~/components/ui/Badge";
 import { AnimatedCounter } from "~/components/ui/AnimatedCounter";
 import { Tabs } from "~/components/ui/Tabs";
+import type { Feedback } from "~/types/feedback";
 
 export const meta = () => ([
     { title: 'CVision | Resume Analysis' },
@@ -155,7 +156,7 @@ const Resume = () => {
     }
 
     // Compute overall score
-    const overallScore = feedback.overallMatch || 0;
+    const overallScore = feedback.overallScore || 0;
 
     // Build Tabs
     const tabs = [
@@ -195,6 +196,32 @@ const Resume = () => {
                             </div>
                         </Card>
                     </div>
+
+                    {(feedback.matchedKeywords?.length > 0 || feedback.missingKeywords?.length > 0) && (
+                        <Card className="p-6 border-[#27272A]">
+                            <h3 className="text-sm font-bold text-[#F8F9FC] mb-4 flex items-center gap-2">
+                                <Target className="w-5 h-5 text-[#6366F1]" /> Keyword Match
+                            </h3>
+                            <div className="space-y-4">
+                                {feedback.matchedKeywords?.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-bold text-[#10B981] uppercase tracking-wider mb-2">✅ Matched</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {feedback.matchedKeywords.map((k, i) => <Badge key={`m-${i}`} variant="success">{k}</Badge>)}
+                                        </div>
+                                    </div>
+                                )}
+                                {feedback.missingKeywords?.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-bold text-[#EF4444] uppercase tracking-wider mb-2">❌ Missing</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {feedback.missingKeywords.map((k, i) => <Badge key={`miss-${i}`} variant="error">{k}</Badge>)}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+                    )}
                 </div>
             )
         },
@@ -203,10 +230,10 @@ const Resume = () => {
             label: 'Section Suggestions',
             content: (
                 <div className="space-y-6 animate-fade-in-up">
-                    {feedback.sectionUpdates?.map((update, i) => (
+                    {feedback.sectionFeedback?.sort((a, b) => a.reorderPriority - b.reorderPriority).map((update, i) => (
                         <CollapsibleSectionCard key={i} update={update} />
                     ))}
-                    {!feedback.sectionUpdates?.length && (
+                    {!feedback.sectionFeedback?.length && (
                         <p className="text-[#A1A1AA]">No specific section updates suggested.</p>
                     )}
                 </div>
@@ -228,28 +255,28 @@ const Resume = () => {
                     <div className="grid md:grid-cols-2 gap-6">
                         <Card className="p-6 border-[#27272A]">
                             <h4 className="text-sm font-bold text-[#10B981] uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4" /> Passing Checks
+                                <CheckCircle2 className="w-4 h-4" /> ATS Tips
                             </h4>
                             <div className="space-y-3">
-                                {feedback.ATS?.tips?.filter(t => t.type === 'good').map((t, i) => (
+                                {feedback.ATS?.tips?.map((t, i) => (
                                     <div key={i} className="flex items-start gap-3">
                                         <CheckCircle2 className="w-4 h-4 text-[#10B981] flex-shrink-0 mt-0.5" />
-                                        <p className="text-[#A1A1AA] text-sm">{t.tip}</p>
+                                        <p className="text-[#A1A1AA] text-sm">{t}</p>
                                     </div>
                                 ))}
                             </div>
                         </Card>
                         <Card className="p-6 border-[#27272A]">
                             <h4 className="text-sm font-bold text-[#F59E0B] uppercase tracking-wider mb-4 flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4" /> Formatting Issues
+                                <AlertTriangle className="w-4 h-4" /> Formatting Issues Detected
                             </h4>
                             <div className="space-y-3">
-                                {feedback.ATS?.tips?.filter(t => t.type === 'improve').map((t, i) => (
+                                {feedback.ATS?.formattingIssues?.length ? feedback.ATS.formattingIssues.map((issue, i) => (
                                     <div key={i} className="flex items-start gap-3">
-                                        <AlertTriangle className="w-4 h-4 text-[#F59E0B] flex-shrink-0 mt-0.5" />
-                                        <p className="text-[#A1A1AA] text-sm">{t.tip}</p>
+                                        <div className="mt-1 w-2 h-2 rounded-full bg-[#F59E0B] flex-shrink-0" />
+                                        <p className="text-[#A1A1AA] text-sm">{issue}</p>
                                     </div>
-                                ))}
+                                )) : <p className="text-[#6B7280] text-sm">No critical formatting issues found.</p>}
                             </div>
                         </Card>
                     </div>
@@ -267,35 +294,90 @@ const Resume = () => {
                             <Badge variant={feedback.toneAndStyle?.score >= 70 ? 'success' : 'warning'}>Score: {feedback.toneAndStyle?.score}/100</Badge>
                         </div>
                         
-                        <div className="space-y-4">
+                        <div className="space-y-4 mb-8">
                             {feedback.toneAndStyle?.tips?.map((tip, i) => (
-                                <div key={i} className={`p-4 rounded-xl border ${tip.type === 'improve' ? 'border-[#EF4444]/20 bg-[#EF4444]/5' : 'border-[#10B981]/20 bg-[#10B981]/5'}`}>
+                                <div key={i} className={`p-4 rounded-xl border border-[#10B981]/20 bg-[#10B981]/5`}>
                                     <div className="flex items-start gap-3">
-                                        {tip.type === 'improve' ? <AlertTriangle className="w-5 h-5 text-[#EF4444] shrink-0" /> : <CheckCircle2 className="w-5 h-5 text-[#10B981] shrink-0" />}
+                                        <CheckCircle2 className="w-5 h-5 text-[#10B981] shrink-0" />
                                         <div>
-                                            <p className={`font-bold mb-1 ${tip.type === 'improve' ? 'text-[#EF4444]' : 'text-[#10B981]'}`}>{tip.tip}</p>
-                                            {tip.explanation && <p className="text-[#A1A1AA] text-sm">{tip.explanation}</p>}
+                                            <p className={`font-bold mb-1 text-[#10B981]`}>{tip}</p>
                                         </div>
                                     </div>
                                 </div>
                             ))}
                         </div>
+
+                        {feedback.toneAndStyle?.rewrites?.length > 0 && (
+                            <div>
+                                <h3 className="text-lg font-bold text-[#F8F9FC] mb-4">Suggested Rewrites</h3>
+                                <div className="space-y-4">
+                                    {feedback.toneAndStyle.rewrites.map((rewrite, i) => (
+                                        <div key={i} className="grid md:grid-cols-2 gap-4">
+                                            <div className="bg-[#1E1E24] rounded-lg p-4 border border-[#27272A]">
+                                                <p className="text-xs font-bold text-[#EF4444] mb-2 uppercase tracking-wide flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Original</p>
+                                                <p className="text-[#A1A1AA] text-sm line-through decoration-[#EF4444]/50">{rewrite.original}</p>
+                                            </div>
+                                            <div className="bg-[#6366F1]/5 rounded-lg p-4 border border-[#6366F1]/20">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <p className="text-xs font-bold text-[#6366F1] uppercase tracking-wide flex items-center gap-1"><Sparkles className="w-3 h-3"/> Improved</p>
+                                                </div>
+                                                <p className="text-[#F8F9FC] text-sm font-medium">{rewrite.improved}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </Card>
+                </div>
+            )
+        },
+        {
+            id: 'structure',
+            label: 'Structure',
+            content: (
+                <div className="space-y-6 animate-fade-in-up">
+                    <Card className="p-6 border-[#27272A]">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-bold text-[#F8F9FC]">Resume Structure</h3>
+                            <Badge variant={feedback.structure?.score >= 70 ? 'success' : 'warning'}>Score: {feedback.structure?.score}/100</Badge>
+                        </div>
+                        
+                        <div className="space-y-4 mb-8">
+                            {feedback.structure?.tips?.map((tip, i) => (
+                                <div key={i} className="flex items-start gap-3">
+                                    <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-[#A1A1AA] flex-shrink-0" />
+                                    <p className="text-[#F8F9FC]">{tip}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        {feedback.recommendedSectionOrder?.length > 0 && (
+                            <div className="mt-8 border-t border-[#27272A] pt-6">
+                                <h4 className="text-sm font-bold text-[#A1A1AA] uppercase tracking-wider mb-4">Recommended Section Order</h4>
+                                <ol className="list-decimal list-inside space-y-2 text-[#F8F9FC] marker:text-[#6366F1] marker:font-bold">
+                                    {feedback.recommendedSectionOrder.map((section, i) => (
+                                        <li key={i} className="pl-2">{section}</li>
+                                    ))}
+                                </ol>
+                            </div>
+                        )}
                     </Card>
                 </div>
             )
         },
         {
             id: 'tailoring',
-            label: 'Tailoring Tips',
+            label: `For ${resume.company_name}`,
             content: (
                 <div className="space-y-6 animate-fade-in-up">
                     <Card className="p-6 border-[#27272A]">
                         <h3 className="text-lg font-bold text-[#F8F9FC] mb-2 flex items-center gap-2">
-                            <Target className="w-5 h-5 text-[#6366F1]" /> For {resume.company_name} Specifically...
+                            <Target className="w-5 h-5 text-[#6366F1]" /> Action Plan
                         </h3>
-                        <p className="text-[#A1A1AA] mb-6 text-sm">How to position your experience for this company's culture and role.</p>
+                        <p className="text-[#A1A1AA] mb-6 text-sm">Top priority actions to take before applying to {resume.company_name}.</p>
 
-                        <div className="space-y-4">
+                        <div className="space-y-4 mb-8">
                             {feedback.recommendations?.map((rec, i) => (
                                 <div key={i} className="flex gap-4 items-start p-4 bg-[#1E1E24] rounded-xl border border-[#27272A]">
                                     <div className="w-8 h-8 rounded-full bg-[#6366F1]/10 flex items-center justify-center shrink-0 border border-[#6366F1]/20 text-[#6366F1] font-bold">
@@ -305,6 +387,22 @@ const Resume = () => {
                                 </div>
                             ))}
                         </div>
+
+                        {feedback.companySpecificTips?.length > 0 && (
+                            <div className="border-t border-[#27272A] pt-6">
+                                <h3 className="text-lg font-bold text-[#F8F9FC] mb-4 flex items-center gap-2">
+                                    <BuildingLogo name={resume.company_name} /> {resume.company_name} Insights
+                                </h3>
+                                <ul className="space-y-3">
+                                    {feedback.companySpecificTips.map((tip, i) => (
+                                        <li key={i} className="flex items-start gap-3">
+                                            <div className="mt-1 w-2 h-2 rounded-full bg-[#10B981] flex-shrink-0" />
+                                            <p className="text-[#A1A1AA]">{tip}</p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
                     </Card>
                 </div>
             )
@@ -395,9 +493,18 @@ function BuildingLogo({ name }: { name: string }) {
 
 function CollapsibleSectionCard({ update }: { update: any }) {
     const [isOpen, setIsOpen] = useState(false);
-    // Determine status badge (mock logic)
-    const status = update.reasoning.length > 50 ? 'warning' : 'success';
     
+    // Status color mapping
+    const getBadgeConfig = (status: string) => {
+        switch (status) {
+            case 'strong': return { variant: 'success' as const, label: '✅ Strong' };
+            case 'missing': return { variant: 'error' as const, label: '❌ Missing' };
+            default: return { variant: 'warning' as const, label: '⚠️ Improve' };
+        }
+    };
+    
+    const badgeConfig = getBadgeConfig(update.status);
+
     return (
         <Card className="border-[#27272A] overflow-hidden">
             <button 
@@ -406,8 +513,8 @@ function CollapsibleSectionCard({ update }: { update: any }) {
             >
                 <div className="flex items-center gap-4">
                     <h3 className="text-lg font-bold text-[#F8F9FC]">{update.section}</h3>
-                    <Badge variant={status === 'warning' ? 'warning' : 'success'}>
-                        {status === 'warning' ? '⚠️ Improve' : '✅ Strong'}
+                    <Badge variant={badgeConfig.variant}>
+                        {badgeConfig.label}
                     </Badge>
                 </div>
                 <div className="text-[#6B7280]">
@@ -423,26 +530,40 @@ function CollapsibleSectionCard({ update }: { update: any }) {
                         className="border-t border-[#27272A] px-6 py-5 bg-[#13131A]/50"
                     >
                         <div className="space-y-6">
-                            <div>
-                                <h4 className="text-sm font-bold text-[#A1A1AA] uppercase tracking-wider mb-2">What to change</h4>
-                                <p className="text-[#F8F9FC] text-sm leading-relaxed">{update.reasoning}</p>
-                            </div>
+                            {update.issues?.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-bold text-[#EF4444] uppercase tracking-wider mb-3">Issues Identified</h4>
+                                    <ul className="space-y-2">
+                                        {update.issues.map((issue: string, i: number) => (
+                                            <li key={i} className="flex items-start gap-2">
+                                                <AlertTriangle className="w-4 h-4 text-[#EF4444] mt-0.5 shrink-0" />
+                                                <p className="text-[#A1A1AA] text-sm leading-relaxed">{issue}</p>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                             
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <div className="bg-[#1E1E24] rounded-lg p-4 border border-[#27272A]">
-                                    <p className="text-xs font-bold text-[#EF4444] mb-2 uppercase tracking-wide">Current</p>
-                                    <p className="text-[#A1A1AA] text-sm italic">"{update.currentContext}"</p>
-                                </div>
-                                <div className="bg-[#6366F1]/5 rounded-lg p-4 border border-[#6366F1]/20">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <p className="text-xs font-bold text-[#6366F1] uppercase tracking-wide flex items-center gap-1"><Sparkles className="w-3 h-3"/> Suggested</p>
-                                        <button className="text-xs font-medium text-[#6366F1] hover:text-[#4F46E5]">Copy</button>
+                            {update.suggestedBullets?.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-bold text-[#6366F1] uppercase tracking-wider mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4" /> Suggested Bullets</h4>
+                                    <div className="space-y-4">
+                                        {update.suggestedBullets.map((bullet: string, i: number) => (
+                                            <div key={i} className="bg-[#6366F1]/5 rounded-lg p-4 border border-[#6366F1]/20 group">
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <p className="text-[#F8F9FC] text-sm font-mono whitespace-pre-wrap">{bullet}</p>
+                                                    <button 
+                                                        onClick={() => navigator.clipboard.writeText(bullet.replace(/^•\s*/, ''))}
+                                                        className="text-xs font-medium text-[#6366F1] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
+                                                    >
+                                                        Copy
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <pre className="text-[#F8F9FC] text-sm font-mono whitespace-pre-wrap">
-                                        {`• ${update.suggestedRevision}`}
-                                    </pre>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </motion.div>
                 )}

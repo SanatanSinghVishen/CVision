@@ -118,7 +118,9 @@ const UploadPage = () => {
                         job_description: jobDescription,
                         resume_path: resumePath,
                         image_path: imagePath,
-                        feedback: null
+                        feedback: null,
+                        status: 'pending',
+                        overall_score: null,
                     })
                     .select()
                     .single();

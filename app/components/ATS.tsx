@@ -1,16 +1,12 @@
 import React from 'react'
 
-interface Suggestion {
-  type: "good" | "improve";
-  tip: string;
-}
-
 interface ATSProps {
   score: number;
-  suggestions: Suggestion[];
+  suggestions: string[];
+  formattingIssues?: string[];
 }
 
-const ATS: React.FC<ATSProps> = ({ score, suggestions }) => {
+const ATS: React.FC<ATSProps> = ({ score, suggestions, formattingIssues }) => {
   const getTheme = (s: number) => {
     if (s >= 80) return { 
         text: "text-[#10B981]", 
@@ -55,20 +51,31 @@ const ATS: React.FC<ATSProps> = ({ score, suggestions }) => {
         </p>
 
         <div className="space-y-4">
-          {suggestions.map((suggestion, index) => (
+          {suggestions?.map((tip, index) => (
             <div key={index} className="flex gap-4 p-5 rounded-2xl bg-[#0A0A0F] border border-[#27272A]">
-              <div className={`mt-0.5 flex-shrink-0 ${suggestion.type === "good" ? "text-[#10B981]" : "text-[#F59E0B]"}`}>
-                {suggestion.type === "good"
-                  ? <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
-                  : <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                }
+              <div className="mt-0.5 flex-shrink-0 text-[#10B981]">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
               </div>
               <p className="text-[#A1A1AA] font-medium leading-relaxed">
-                {suggestion.tip}
+                {tip}
               </p>
             </div>
           ))}
         </div>
+
+        {formattingIssues && formattingIssues.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-bold text-[#F59E0B] mb-4">Formatting Issues Detected</h3>
+            <ul className="space-y-3">
+              {formattingIssues.map((issue, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <div className="mt-1 w-2 h-2 rounded-full bg-[#F59E0B] flex-shrink-0" />
+                  <p className="text-[#A1A1AA] leading-relaxed">{issue}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <p className="text-[#6B7280] font-medium text-sm italic border-t border-[#27272A] pt-6 mt-6">
           Keep refining your resume to improve your chances of getting past ATS filters.

@@ -1,114 +1,211 @@
 import Groq from "groq-sdk";
+import sanitizeHtml from "sanitize-html";
+import { FeedbackSchema, Feedback } from "../schemas/feedback";
+
+export const parseWithRetry = async (
+  rawResponse: string,
+  retryFn: () => Promise<string>,
+  attempts = 0
+): Promise<Feedback> => {
+  const stripped = rawResponse.replace(/```json|```/g, '').trim();
+
+  try {
+    const parsed = JSON.parse(stripped);
+    const validated = FeedbackSchema.safeParse(parsed);
+
+    if (validated.success) return validated.data;
+
+    // Schema mismatch — retry once
+    if (attempts < 1) {
+      console.warn('LLM schema mismatch, retrying...', validated.error.issues);
+      const retryResponse = await retryFn();
+      return parseWithRetry(retryResponse, retryFn, attempts + 1);
+    }
+
+    throw new Error('LLM returned invalid schema after retry');
+  } catch (e) {
+    if (attempts < 1) {
+      console.warn('JSON parsing failed, retrying...', e);
+      const retryResponse = await retryFn();
+      return parseWithRetry(retryResponse, retryFn, attempts + 1);
+    }
+    throw new Error('Failed to parse LLM response');
+  }
+};
 
 export async function analyzeResume(
-    params: {
-        companyName: string;
-        jobTitle: string;
-        jobDescription: string;
-        resumeText: string;
-    }
+    resumeText: string,
+    jobTitle: string,
+    jobDescription: string,
+    companyName: string,
+    resumeId: string
 ) {
-    const { companyName, jobTitle, jobDescription, resumeText } = params;
-
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
         throw new Error("Missing GROQ_API_KEY environment variable.");
     }
 
-    const groq = new Groq({
-        apiKey,
+    const groq = new Groq({ apiKey });
+    const prompt = buildPrompt(companyName, jobTitle, jobDescription, resumeText);
+
+    const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), ms)
+      );
+      return Promise.race([promise, timeout]);
+    };
+
+    const fetchAI = async () => {
+        const response = await withTimeout(
+            groq.chat.completions.create({
+                model: "llama-3.3-70b-versatile",
+                messages: [
+                    {
+                        role: "user",
+                        content: prompt,
+                    },
+                ],
+                response_format: { type: "json_object" },
+            }),
+            30_000 // 30 second timeout
+        );
+        const content = response.choices[0].message.content;
+        const tokensUsed = response.usage?.total_tokens || 0;
+        if (!content) throw new Error("No response content from AI");
+        return { content, tokensUsed };
+    };
+
+    const initialResult = await fetchAI();
+    const feedback = await parseWithRetry(initialResult.content, async () => {
+        const res = await fetchAI();
+        return res.content;
     });
 
-    const prompt = `
-  You are an elite Tech Recruiter and Resume Coach for ${companyName}. 
-  I will provide you with a candidate's resume and a job description for a ${jobTitle} role at ${companyName}.
-  
-  Target Company: ${companyName}
-  Job Title: ${jobTitle}
-  Job Description: ${jobDescription}
+    return { feedback, tokensUsed: initialResult.tokensUsed };
+}
 
-  Resume Content:
-  ${resumeText}
+export function buildPrompt(
+    companyName: string,
+    jobTitle: string,
+    jobDescription: string,
+    resumeText: string
+) {
+    const clean = (text: string) => sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} });
 
-  Your objective is to critically analyze the resume against the requirements of ${companyName} for the ${jobTitle} role.
-  Provide actionable, specific feedback, focusing on exact sections, context, and new bullet point suggestions.
-  Return a JSON response with the following EXACT structure:
-  {
-    "summary": "Professional summary of the candidate's fit for the role (2-3 sentences)",
-    "overallMatch": 85,
-    "strengths": ["Strength 1", "Strength 2", "Strength 3"],
-    "weaknesses": ["Weakness 1", "Weakness 2", "Weakness 3"],
-    "sectionUpdates": [
-        {
-            "section": "Professional Experience",
-            "currentContext": "Briefly describe what is currently written that needs to be improved.",
-            "suggestedRevision": "Provide an EXACT, newly rewritten bullet point to be inserted here, using strong action verbs and highlighting metrics relevant to the job.",
-            "reasoning": "Explain WHY this change is needed for this specific role at ${companyName}."
-        }
-    ],
-    "reorderingSuggestions": [
-        "Suggestion on moving a section (e.g., 'Move Skills to the top to immediately highlight technical proficiency for this role.')"
-    ],
-    "ATS": {
-        "score": 85,
-        "tips": [{"type": "good", "tip": "Brief tip title"}, {"type": "improve", "tip": "Brief tip title"}]
-    },
-    "recommendations": ["Recommendation 1", "Recommendation 2", "Recommendation 3"],
-    "toneAndStyle": {
-        "score": 75,
-        "tips": [
-            {"type": "good", "tip": "Brief tip title", "explanation": "Detailed explanation"},
-            {"type": "improve", "tip": "Brief tip title", "explanation": "Detailed explanation"}
-        ]
-    },
-    "content": {
-        "score": 80,
-        "tips": [
-            {"type": "good", "tip": "Brief tip title", "explanation": "Detailed explanation"},
-            {"type": "improve", "tip": "Brief tip title", "explanation": "Detailed explanation"}
-        ]
-    },
-    "structure": {
-        "score": 70,
-        "tips": [
-            {"type": "good", "tip": "Brief tip title", "explanation": "Detailed explanation"},
-            {"type": "improve", "tip": "Brief tip title", "explanation": "Detailed explanation"}
-        ]
-    },
-    "skills": {
-        "score": 85,
-        "tips": [
-            {"type": "good", "tip": "Brief tip title", "explanation": "Detailed explanation"},
-            {"type": "improve", "tip": "Brief tip title", "explanation": "Detailed explanation"}
-        ]
+    const safeResumeText = clean(resumeText);
+    const safeJobDescription = clean(jobDescription);
+    const safeJobTitle = clean(jobTitle);
+    const safeCompanyName = clean(companyName);
+
+    return `
+You are a senior engineering hiring manager and resume coach at ${safeCompanyName}.
+
+You are reviewing a candidate's resume for the position of "${safeJobTitle}" at ${safeCompanyName}.
+
+CRITICAL INSTRUCTION: Every piece of feedback you generate must be specific to:
+1. The exact role: ${safeJobTitle}
+2. The exact company: ${safeCompanyName}
+3. The actual content of the resume provided below
+Generic advice is strictly not acceptable. If a tip could apply to any company or any resume, rewrite it until it cannot.
+
+Job Description:
+${safeJobDescription}
+
+Resume Content:
+${safeResumeText}
+
+Return ONLY a valid JSON object. No markdown. No explanation. No text outside the JSON.
+The JSON must follow this exact schema:
+
+{
+  "summary": "3-4 sentence honest assessment of fit for ${safeJobTitle} at ${safeCompanyName}. Be direct.",
+
+  "overallScore": 85,
+
+  "matchedKeywords": ["keyword from JD found in resume"],
+  "missingKeywords": ["important JD keyword absent from resume"],
+
+  "strengths": [
+    "Specific strength referencing actual resume content and why it matters for ${safeCompanyName}"
+  ],
+  "weaknesses": [
+    "Specific gap referencing actual resume content and why it matters for ${safeCompanyName}"
+  ],
+
+  "sectionFeedback": [
+    {
+      "section": "Skills | Projects | Experience | Education | Summary | Achievements",
+      "status": "strong | improve | missing",
+      "issues": ["Specific issue with this section for this role"],
+      "suggestedBullets": [
+        "• Complete ready-to-paste bullet point tailored for ${safeJobTitle} at ${safeCompanyName}"
+      ],
+      "reorderPriority": 1
     }
-  }
+  ],
 
-  IMPORTANT: 
-  - Return ONLY valid JSON properly formatted
-  - Do not include markdown code blocks
-  - Tailor all advice specifically for ${companyName}. Provide at least 2-3 sectionUpdates.
-  - Each category (toneAndStyle, content, structure, skills) must have a score (0-100) and tips array
-  - Each tip must have "type" (either "good" or "improve"), "tip" (short title), and "explanation" (detailed description)
-  `;
+  "recommendedSectionOrder": ["Section1", "Section2", "Section3"],
 
-    const response = await groq.chat.completions.create({
+  "ATS": {
+    "score": 85,
+    "tips": ["Specific ATS improvement for this role"],
+    "formattingIssues": ["Specific formatting problem found"]
+  },
+
+  "toneAndStyle": {
+    "score": 75,
+    "tips": ["Specific tone issue for ${safeCompanyName}'s culture"],
+    "rewrites": [
+      {
+        "original": "exact weak phrase copied from the resume",
+        "improved": "stronger version written for ${safeJobTitle} at ${safeCompanyName}"
+      }
+    ]
+  },
+
+  "content": {
+    "score": 80,
+    "tips": ["Content gap specific to ${safeJobTitle} requirements"]
+  },
+
+  "structure": {
+    "score": 70,
+    "tips": ["Structure improvement for ${safeCompanyName}'s expectations"]
+  },
+
+  "companySpecificTips": [
+    "Tip that only applies to ${safeCompanyName} — reference their known culture, stack, or values"
+  ],
+
+  "recommendations": [
+    "Top priority action the candidate should take before applying to ${safeCompanyName}"
+  ]
+}
+`;
+}
+
+export async function* streamAnalyzeResume(
+    resumeText: string,
+    jobTitle: string,
+    jobDescription: string,
+    companyName: string
+) {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+        throw new Error("Missing GROQ_API_KEY environment variable.");
+    }
+
+    const groq = new Groq({ apiKey });
+    const prompt = buildPrompt(companyName, jobTitle, jobDescription, resumeText);
+
+    const stream = await groq.chat.completions.create({
         model: "llama-3.3-70b-versatile",
-        messages: [
-            {
-                role: "user",
-                content: prompt,
-            },
-        ],
-        response_format: { type: "json_object" },
+        messages: [{ role: "user", content: prompt }],
+        stream: true,
     });
-
-    const content = response.choices[0].message.content;
-    if (!content) throw new Error("No response content from AI");
-
-    try {
-        return JSON.parse(content);
-    } catch (e) {
-        throw new Error("Failed to parse AI response as JSON: " + content);
+    
+    for await (const chunk of stream) {
+        yield chunk.choices[0]?.delta?.content || "";
     }
 }
+

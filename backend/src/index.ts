@@ -3,20 +3,15 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { z } from 'zod';
 import rateLimit from 'express-rate-limit';
-import { createClient } from '@supabase/supabase-js';
-import { analyzeResume } from './services/ai';
+import { supabaseAdmin } from './lib/supabase';
+import { authMiddleware } from './middleware/auth';
+import { analyzeResume, streamAnalyzeResume, parseWithRetry } from './services/ai';
+import analysesRouter from './routes/analyses';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
-
-// Initialize Supabase Admin client
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabaseAdmin = (supabaseUrl && supabaseServiceKey) 
-    ? createClient(supabaseUrl, supabaseServiceKey) 
-    : null;
 
 app.use(cors({
     origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173',
@@ -26,15 +21,52 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+import Groq from "groq-sdk";
+
+app.get('/health', async (req, res) => {
+    try {
+        const apiKey = process.env.GROQ_API_KEY;
+        const groq = new Groq({ apiKey });
+        const groqOk = await groq.models.list().then(() => true).catch(() => false);
+        
+        let dbError = null;
+        if (supabaseAdmin) {
+            const { error } = await supabaseAdmin.from('resumes').select('id').limit(1);
+            dbError = error;
+        } else {
+            dbError = { message: 'Supabase Admin not initialized' };
+        }
+
+        res.json({
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            uptime: Math.floor(process.uptime()),
+            services: {
+                groq: groqOk ? 'connected' : 'error',
+                supabase: dbError ? 'error' : 'connected',
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ status: 'error', details: e });
+    }
 });
 
+import { AuthRequest } from './middleware/auth';
+
 // Rate limiting setup
-const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per window
-    message: { error: 'Too many requests, please try again later.' }
+const analysisRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10, // Limit each user to 10 requests per window
+    keyGenerator: (req: any) => (req as AuthRequest).user?.id ?? req.ip,
+    handler: (req, res) => {
+        const resetTime = (req as any).rateLimit?.resetTime;
+        const retryAfter = resetTime ? Math.ceil((resetTime.getTime() - Date.now()) / 1000 / 60) + ' minutes' : 'later';
+        res.status(429).json({
+            error: 'Analysis limit reached',
+            message: 'You can analyze up to 10 resumes per hour.',
+            retryAfter
+        });
+    }
 });
 
 // Zod schema for payload validation
@@ -46,7 +78,7 @@ const analyzeSchema = z.object({
     resumeId: z.string().uuid("Invalid resume ID format")
 });
 
-app.post('/analyze', apiLimiter, async (req, res) => {
+app.post('/analyze', authMiddleware, analysisRateLimiter, async (req, res): Promise<any> => {
     try {
         // Validate request body
         const parsedBody = analyzeSchema.safeParse(req.body);
@@ -59,18 +91,49 @@ app.post('/analyze', apiLimiter, async (req, res) => {
 
         const { companyName, jobTitle, jobDescription, resumeText, resumeId } = parsedBody.data;
 
-        const feedback = await analyzeResume({
-            companyName,
-            jobTitle,
-            jobDescription,
-            resumeText,
-        });
+        const startTime = Date.now();
+        let feedbackResult: any;
+        let tokensUsed = 0;
+        let aiError = null;
+
+        try {
+            const result = await analyzeResume(
+                resumeText,
+                jobTitle,
+                jobDescription,
+                companyName,
+                resumeId
+            );
+            feedbackResult = result.feedback;
+            tokensUsed = result.tokensUsed;
+        } catch (err: any) {
+            aiError = err.message;
+            throw err;
+        } finally {
+            if (supabaseAdmin) {
+                await supabaseAdmin.from('usage_logs').insert({
+                    user_id: (req as any).user?.id,
+                    action: 'analyze',
+                    company_name: companyName,
+                    job_title: jobTitle,
+                    tokens_used: tokensUsed,
+                    latency_ms: Date.now() - startTime,
+                    success: !aiError,
+                    error_message: aiError
+                });
+            }
+        }
 
         // Update Database directly from Backend safely via Service Role
-        if (supabaseAdmin) {
+        if (supabaseAdmin && feedbackResult) {
             const { error: dbError } = await supabaseAdmin
                 .from('resumes')
-                .update({ feedback, company_name: companyName })
+                .update({ 
+                    feedback: feedbackResult, 
+                    company_name: companyName,
+                    overall_score: feedbackResult.overallScore,
+                    status: 'completed'
+                })
                 .eq('id', resumeId);
                 
             if (dbError) {
@@ -81,56 +144,70 @@ app.post('/analyze', apiLimiter, async (req, res) => {
             console.warn("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. DB update skipped.");
         }
 
-        res.json({ feedback });
+        res.json({ feedback: feedbackResult });
     } catch (error: any) {
         console.error('Analysis error:', error);
         res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
 });
 
-app.get('/analyses/:userId', async (req, res) => {
+app.post('/analyze/stream', authMiddleware, analysisRateLimiter, async (req, res): Promise<any> => {
     try {
-        const { userId } = req.params;
+        const parsedBody = analyzeSchema.safeParse(req.body);
+        if (!parsedBody.success) {
+            return res.status(400).json({ error: 'Invalid input', details: parsedBody.error.issues });
+        }
         
-        if (!supabaseAdmin) {
-            return res.status(500).json({ error: "Database connection not configured" });
+        const { companyName, jobTitle, jobDescription, resumeText, resumeId } = parsedBody.data;
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        const stream = streamAnalyzeResume(resumeText, jobTitle, jobDescription, companyName);
+        let fullResponse = '';
+
+        for await (const delta of stream) {
+            fullResponse += delta;
+            res.write(`data: ${JSON.stringify({ delta })}\n\n`);
         }
 
-        const { data, error } = await supabaseAdmin
-            .from('resumes')
-            .select('id, company_name, job_title, created_at, feedback')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-
-        if (error) {
-            console.error("Supabase query error:", error);
-            return res.status(500).json({ error: 'Database query failed' });
+        // Validate and save full response
+        const feedback = await parseWithRetry(fullResponse, () => Promise.reject(new Error('Streaming retries not supported')));
+        
+        if (supabaseAdmin) {
+            await supabaseAdmin.from('resumes').update({ 
+                feedback, 
+                company_name: companyName,
+                overall_score: feedback.overallScore,
+                status: 'completed'
+            }).eq('id', resumeId);
         }
 
-        // Only send scores if feedback exists to keep it lightweight
-        const lightweightData = data.map(item => {
-            const fb = item.feedback;
-            let lightweightFeedback: any = null;
-            if (fb) {
-                lightweightFeedback = {
-                    ATS: fb.ATS ? { score: fb.ATS.score } : undefined,
-                    content: fb.content ? { score: fb.content.score } : undefined,
-                    toneAndStyle: fb.toneAndStyle ? { score: fb.toneAndStyle.score } : undefined,
-                    structure: fb.structure ? { score: fb.structure.score } : undefined,
-                };
-            }
-            
-            return {
-                ...item,
-                feedback: lightweightFeedback
-            };
-        });
-
-        res.json(lightweightData);
+        res.write(`data: ${JSON.stringify({ done: true, resumeId })}\n\n`);
+        res.end();
     } catch (error: any) {
-        console.error('Fetch analyses error:', error);
-        res.status(500).json({ error: error.message || 'Internal Server Error' });
+        console.error('Stream Analysis error:', error);
+        res.write(`data: ${JSON.stringify({ error: error.message || 'Stream failed' })}\n\n`);
+        res.end();
     }
+});
+
+app.use('/analyses', authMiddleware, analysesRouter);
+
+import { Request, Response, NextFunction } from 'express';
+
+app.use((err: Error, req: Request, res: Response, next: NextFunction): any => {
+    console.error(`[${new Date().toISOString()}] ${err.message}`);
+
+    if (err.message.includes('payload too large')) {
+        return res.status(413).json({ error: 'Resume file is too large. Maximum size is 5MB.' });
+    }
+    if (err.message.includes('timeout')) {
+        return res.status(503).json({ error: 'Analysis timed out. Please try again.' });
+    }
+
+    return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 });
 
 app.listen(port, () => {
