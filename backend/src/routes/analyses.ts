@@ -83,4 +83,28 @@ router.get('/:userId/:resumeId', async (req: AuthRequest, res): Promise<any> => 
   return res.json(data);
 });
 
+router.delete('/:userId', async (req: AuthRequest, res): Promise<any> => {
+  const { userId } = req.params;
+
+  if (req.user?.id !== userId) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Database not configured' });
+  }
+
+  const { error } = await supabaseAdmin
+    .from('resumes')
+    .delete()
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error("Delete analyses error:", error);
+    return res.status(500).json({ error: 'Failed to wipe analyses' });
+  }
+
+  return res.json({ success: true });
+});
+
 export default router;

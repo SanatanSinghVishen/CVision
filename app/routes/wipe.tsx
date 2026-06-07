@@ -62,13 +62,19 @@ const WipePage = () => {
                 if (storageError) console.warn("Storage delete partial error:", storageError.message);
             }
 
-            // Delete all DB rows
-            const { error: dbError } = await supabase
-                .from("resumes")
-                .delete()
-                .eq("user_id", session.user.id);
+            // Delete all DB rows via the authenticated backend API
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const deleteResponse = await fetch(`${apiUrl}/analyses/${session.user.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                }
+            });
 
-            if (dbError) throw new Error(dbError.message);
+            if (!deleteResponse.ok) {
+                const errData = await deleteResponse.json().catch(() => ({}));
+                throw new Error(errData.error || "Failed to wipe database records");
+            }
 
             setResumes([]);
             setDone(true);
