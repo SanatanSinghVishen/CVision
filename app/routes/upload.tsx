@@ -95,69 +95,64 @@ const UploadPage = () => {
         setTimeout(() => setShakeFields(false), 500);
     };
 
-    const analyzeWithStream = async (payload: AnalyzePayload, token: string) => {
+    const submitAndPoll = async (payload: AnalyzePayload, token: string) => {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-        const response = await fetch(`${apiUrl}/analyze/stream`, {
+        
+        // Step 1 — Submit job, get jobId back immediately
+        const submitRes = await fetch(`${apiUrl}/analyze`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
+                Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
         });
 
-        if (!response.ok || !response.body) {
-            const err = await response.json().catch(() => ({}));
-            if (response.status === 429) {
-                throw new Error('Analysis limit reached. Try again in an hour.');
-            } else if (response.status === 401) {
-                throw new Error('Session expired. Please log in again.');
-            } else {
-                throw new Error(err.error ?? 'Something went wrong. Please try again.');
-            }
+        if (!submitRes.ok) {
+            const err = await submitRes.json();
+            throw new Error(err.error ?? 'Failed to start analysis');
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        let totalTokensEstimate = 0; // rough tracking
+        const { jobId, resumeId } = await submitRes.json();
+        setLoadingStage('analyzing');
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const lines = decoder.decode(value, { stream: true }).split('\n\n');
-
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-
-                let data;
-                try {
-                    data = JSON.parse(line.replace('data: ', '').trim());
-                } catch {
-                    continue; // Skip malformed JSON chunks
-                }
-
-                if (data.delta) {
-                    setStreamBuffer(prev => prev + data.delta);
-                    totalTokensEstimate++;
-                    
-                    // Stage transitions based on rough token count
-                    if (totalTokensEstimate === 1) setLoadingStage('reading');
-                    else if (totalTokensEstimate === 50) setLoadingStage('analyzing');
-                    else if (totalTokensEstimate === 300) setLoadingStage('building');
-                }
-
-                if (data.done && data.resumeId) {
-                    navigate(`/resume/${data.resumeId}`);
-                    return;
-                }
-
-                if (data.error) {
-                    throw new Error(data.error); // Re-thrown and caught by outer upload handler
-                }
+        // Step 2 — Poll every 2 seconds until done or failed
+        const poll = async (): Promise<void> => {
+            const statusRes = await fetch(`${apiUrl}/job/${jobId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            if (!statusRes.ok) {
+                // If there's a transient network error, wait and try again instead of immediately failing
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                return poll();
             }
-        }
+            
+            const status = await statusRes.json();
+
+            // Update progress bar based on job progress (0-100)
+            if (status.progress) {
+                // Approximate stages based on progress
+                if (status.progress >= 10 && status.progress < 90) setLoadingStage('analyzing');
+                if (status.progress >= 90) setLoadingStage('building');
+            }
+
+            if (status.status === 'completed') {
+                setLoadingStage('building');
+                setTimeout(() => navigate(`/resume/${resumeId}`), 500);
+                return;
+            }
+
+            if (status.status === 'failed') {
+                throw new Error(status.error ?? 'Analysis failed. Please try again.');
+            }
+
+            // Still running — poll again in 2 seconds
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return poll();
+        };
+
+        await poll();
     };
 
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -222,7 +217,7 @@ const UploadPage = () => {
             targetResumeId = dbData.id;
 
             try {
-                await analyzeWithStream({
+                await submitAndPoll({
                     companyName,
                     jobTitle,
                     jobDescription,

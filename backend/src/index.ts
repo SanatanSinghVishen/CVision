@@ -6,6 +6,8 @@ import { supabaseAdmin } from './lib/supabase';
 import { authMiddleware } from './middleware/auth';
 import { analyzeResume, streamAnalyzeResume, parseWithRetry } from './services/ai';
 import analysesRouter from './routes/analyses';
+import { enqueueAnalysis, getJobStatus } from './lib/queue';
+import './workers/analysisWorker';
 
 dotenv.config();
 
@@ -65,7 +67,6 @@ const analyzeSchema = z.object({
 
 app.post('/analyze', authMiddleware, analysisRateLimiter, async (req, res): Promise<any> => {
     try {
-        // Validate request body
         const parsedBody = analyzeSchema.safeParse(req.body);
         if (!parsedBody.success) {
             return res.status(400).json({ 
@@ -76,26 +77,39 @@ app.post('/analyze', authMiddleware, analysisRateLimiter, async (req, res): Prom
 
         const { companyName, jobTitle, jobDescription, resumeText, resumeId, forceRefresh } = parsedBody.data;
 
-        try {
-            const feedbackResult = await analyzeResume(
-                resumeText,
-                jobTitle,
-                jobDescription,
-                companyName,
-                resumeId,
-                (req as any).user.id,
-                forceRefresh || false
-            );
-            
-            res.json({ feedback: feedbackResult });
-        } catch (error: any) {
-            console.error('Analysis error:', error);
-            res.status(500).json({ error: error.message || 'Internal Server Error' });
-        }
+        // Enqueue — returns in <100ms
+        const jobId = await enqueueAnalysis({
+            resumeId,
+            userId: (req as any).user.id,
+            resumeText,
+            jobTitle,
+            jobDescription,
+            companyName,
+            forceRefresh: forceRefresh || false,
+        });
+
+        return res.status(202).json({
+            jobId,
+            resumeId,
+            status: 'queued',
+            pollUrl: `/job/${jobId}`,
+        });
     } catch (error: any) {
         console.error('Analysis error:', error);
         res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
+});
+
+// ── GET /job/:jobId — poll for job status ────────────────────────────────────
+app.get('/job/:jobId', authMiddleware, async (req, res): Promise<any> => {
+  const { jobId } = req.params;
+  const status = await getJobStatus(jobId);
+
+  if (status.status === 'not_found') {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+
+  return res.json(status);
 });
 
 app.post('/analyze/stream', authMiddleware, analysisRateLimiter, async (req, res): Promise<any> => {
