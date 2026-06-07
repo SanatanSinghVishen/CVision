@@ -16,7 +16,7 @@ const port = process.env.PORT || 3000;
 app.use(cors({
     origin: process.env.ALLOWED_ORIGIN || 'http://localhost:5173',
     methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
 }));
 
 app.use(express.json({ limit: '10mb' }));
