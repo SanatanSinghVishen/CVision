@@ -26,6 +26,23 @@ app.use(express.json({ limit: '10mb' }));
 
 import Groq from "groq-sdk";
 
+// ── GET /ping — lightweight Supabase keepalive for cron jobs ──────────────────
+app.get('/ping', async (req, res): Promise<any> => {
+  try {
+    if (!supabaseAdmin) {
+      return res.status(503).json({ status: 'error', message: 'Supabase not initialized' });
+    }
+    // Minimal query — just checks the DB connection is alive
+    const { error } = await supabaseAdmin.from('resumes').select('id', { count: 'exact', head: true });
+    if (error) {
+      return res.status(503).json({ status: 'error', message: error.message });
+    }
+    return res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    return res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 app.get('/health', async (req, res): Promise<any> => {
   const apiKey = process.env.GROQ_API_KEY;
   const groq = new Groq({ apiKey });

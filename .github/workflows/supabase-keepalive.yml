@@ -1,0 +1,48 @@
+name: Supabase Keepalive
+
+# Runs every 5 days to prevent Supabase free tier from pausing after 7 days of inactivity
+on:
+  schedule:
+    # At 08:00 UTC every 5 days (1st, 6th, 11th, 16th, 21st, 26th, 31st)
+    - cron: '0 8 1,6,11,16,21,26,31 * *'
+  workflow_dispatch: # Allow manual trigger for testing
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping Supabase via backend
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            "${{ secrets.BACKEND_URL }}/ping")
+
+          echo "Response code: $RESPONSE"
+
+          if [ "$RESPONSE" -eq 200 ]; then
+            echo "✅ Supabase keepalive ping successful"
+          else
+            echo "❌ Keepalive ping failed with status $RESPONSE"
+            exit 1
+          fi
+
+      - name: Direct Supabase ping (fallback)
+        if: failure()
+        run: |
+          # If the backend is down, ping Supabase directly using the REST API
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/resumes?select=id&limit=1")
+
+          echo "Direct Supabase response code: $RESPONSE"
+
+          if [ "$RESPONSE" -eq 200 ]; then
+            echo "✅ Direct Supabase ping successful (backend was down)"
+          else
+            echo "❌ Both backend and direct Supabase pings failed"
+            exit 1
+          fi
